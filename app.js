@@ -169,8 +169,92 @@ function inline(element, text) {
   element.append(text.slice(cursor));
 }
 
-function renderPreview(cv, original = Boolean(cv?.sourcePDF) && !editablePreviews.has(cv)) {
+let reflowPreview;
+let previewWidth;
+new ResizeObserver(() => {
+  const width = $('paper').clientWidth;
+  if (width !== previewWidth) {
+    previewWidth = width;
+    reflowPreview?.();
+  }
+}).observe($('paper'));
+
+function paginatePreview(paper, content) {
+  let page;
+  let body;
+  let parents;
+  let copies;
+  const addPage = () => {
+    page = node('div', undefined, 'preview-page');
+    body = node('div', undefined, 'preview-page-content');
+    page.append(body);
+    paper.append(page);
+    parents = [];
+    copies = [body];
+  };
+  const append = (path, element) => {
+    let depth = 0;
+    while (depth < parents.length && parents[depth] === path[depth]) depth++;
+    copies.length = depth + 1;
+    for (const parent of path.slice(depth)) {
+      const copy = parent.cloneNode(false);
+      copies.at(-1).append(copy);
+      copies.push(copy);
+    }
+    const copy = element.cloneNode(true);
+    copies.at(-1).append(copy);
+    parents = path;
+    return copy;
+  };
+  // shortcut: a single oversized text block can grow a page; split inside text if needed.
+  const place = parts => {
+    const hadContent = body.hasChildNodes();
+    const added = parts.map(([path, element]) => append(path, element));
+    if (hadContent && page.offsetHeight > page.clientWidth * 297 / 210 + 1) {
+      for (const element of added.reverse()) {
+        let parent = element.parentNode;
+        element.remove();
+        while (parent !== body && !parent.hasChildNodes()) {
+          const empty = parent;
+          parent = empty.parentNode;
+          empty.remove();
+        }
+      }
+      addPage();
+      for (const [path, element] of parts) append(path, element);
+    }
+  };
+
+  paper.replaceChildren();
+  addPage();
+  for (const block of content.children) {
+    if (!block.matches('.cv-section')) {
+      place([[[], block]]);
+      continue;
+    }
+    let pending = [[[block], block.firstElementChild]];
+    for (const entry of Array.from(block.children).slice(1)) {
+      for (const child of entry.children) {
+        const path = [block, entry];
+        if (child.matches('div.cv-line') && child.nextElementSibling) {
+          pending.push([path, child]);
+          continue;
+        }
+        for (const part of child.matches('ul') ? child.children : [child]) {
+          const partPath = part === child ? path : [...path, child];
+          place([...pending, [partPath, part]]);
+          pending = [];
+        }
+      }
+    }
+  }
+}
+
+function renderPreview(cv, original = Boolean(cv?.sourcePDF) && !editablePreviews.has(cv), paginate = true) {
+  reflowPreview = undefined;
   const paper = $('paper');
+  paper.classList.toggle('paginated-paper', Boolean(cv) && !original && paginate);
+
   const controls = $('preview-controls');
   controls.replaceChildren();
   paper.classList.toggle('pdf-paper', original);
@@ -203,7 +287,8 @@ function renderPreview(cv, original = Boolean(cv?.sourcePDF) && !editablePreview
   head.append(node('h1', [cv.name, cv.role].filter(Boolean).join(' - ') || 'Họ tên'), contact);
   const summary = node('p', undefined, 'summary');
   inline(summary, cv.summary);
-  paper.replaceChildren(head, summary);
+  const content = node('div');
+  content.append(head, summary);
   for (const section of cv.sections) {
     const entries = section.entries.filter(entry => Object.values(entry).some(value => value.trim()));
     if (section.hidden || !entries.length) continue;
@@ -250,7 +335,13 @@ function renderPreview(cv, original = Boolean(cv?.sourcePDF) && !editablePreview
       }
       block.append(item);
     }
-    paper.append(block);
+    content.append(block);
+  }
+  if (paginate) {
+    reflowPreview = () => paginatePreview(paper, content);
+    reflowPreview();
+  } else {
+    paper.replaceChildren(...content.children);
   }
 }
 
@@ -285,7 +376,7 @@ function exportPDF(version) {
   const originalTitle = document.title;
   const filename = [version.cv.name, version.cv.role, version.label].filter(Boolean).join('-');
   document.title = filename.replace(/[<>:"/\\|?*\u0000-\u001f]/gu, '-').replace(/\s+/gu, '_');
-  renderPreview(version.cv, false);
+  renderPreview(version.cv, false, false);
   window.addEventListener('afterprint', () => {
     document.title = originalTitle;
     renderPreview(active()?.draft);
