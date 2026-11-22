@@ -373,7 +373,7 @@ function showDialog(title, ...content) {
 
 function exportPDF(version) {
   $('dialog').close();
-  const filename = [version.cv.name, version.cv.role, version.label].filter(Boolean).join('-');
+  const filename = (active().label.trim() || 'CV').replace(/[<>:"/\\|?*\u0000-\u001f]/gu, '-').replace(/[. ]+$/u, '') || 'CV';
   const frame = node('iframe', undefined, 'print-frame');
   frame.title = 'Bản in CV';
   frame.tabIndex = -1;
@@ -382,9 +382,15 @@ function exportPDF(version) {
   renderPreview(active()?.draft);
 
   frame.addEventListener('load', () => {
-    frame.contentDocument.title = filename.replace(/[<>:"/\\|?*\u0000-\u001f]/gu, '-').replace(/\s+/gu, '_');
+    const originalTitle = document.title;
+    frame.contentDocument.title = filename;
     frame.contentDocument.querySelector('main').append(paper);
-    frame.contentWindow.addEventListener('afterprint', () => frame.remove(), { once: true });
+    frame.contentWindow.addEventListener('afterprint', () => {
+      document.title = originalTitle;
+      frame.remove();
+    }, { once: true });
+    // Chrome uses the top-level title to suggest the PDF filename.
+    document.title = filename;
     frame.contentWindow.print();
   }, { once: true });
   frame.srcdoc = '<!doctype html><html lang="vi"><head><meta charset="utf-8">' +
