@@ -158,12 +158,15 @@ function renderEditor(openSections = []) {
   const basic = node('div', undefined, 'card');
   const identity = node('div', undefined, 'row');
   identity.append(bind('Họ tên', cv, 'name'), bind('Vị trí', cv, 'role'));
-  basic.append(bind('Tên CV', doc, 'label'), identity, bind('Liên hệ', cv, 'contacts', true),
+  basic.append(identity, bind('Liên hệ', cv, 'contacts', true),
     bind('Giới thiệu', cv, 'summary', true));
-  basic.firstChild.querySelector('input').addEventListener('input', () => {
+  const nameCard = node('div', undefined, 'card');
+  const resumeName = bind('Tên CV', doc, 'label');
+  resumeName.querySelector('input').addEventListener('input', () => {
     $('documents').selectedOptions[0].textContent = doc.label || 'CV chưa đặt tên';
   });
-  fields.replaceChildren(basic, addAppearance(cv, () => { checkpoint(); persist(); editablePreviews.add(cv); renderPreview(cv); }));
+  nameCard.append(resumeName);
+  fields.replaceChildren(nameCard, addAppearance(cv, () => { checkpoint(); persist(); editablePreviews.add(cv); renderPreview(cv); }), basic);
 
   cv.sections.forEach((section, index) => {
     const card = node('details', undefined, 'card');
