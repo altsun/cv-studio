@@ -266,15 +266,32 @@ new ResizeObserver(() => {
 }).observe($('paper'));
 
 function paginatePreview(paper, content) {
+  const columns = paper.dataset.template === 'columns';
+  const pages = [];
+  let lane = -1;
+  let pageIndex = -1;
   let page;
   let body;
   let parents;
   let copies;
   const addPage = () => {
-    page = node('div', undefined, 'preview-page');
-    body = node('div', undefined, 'preview-page-content');
-    page.append(body);
-    paper.append(page);
+    pageIndex++;
+    if (!pages[pageIndex]) {
+      const sheet = node('div', undefined, 'preview-page');
+      const content = node('div', undefined, 'preview-page-content');
+      sheet.append(content);
+      paper.append(sheet);
+      pages.push([sheet, content]);
+    }
+    const [sheet, content] = pages[pageIndex];
+    page = sheet;
+    body = content;
+    if (lane >= 0) {
+      if (!content.lastElementChild?.matches('.cv-column')) {
+        content.append(node('div', undefined, 'cv-column'), node('div', undefined, 'cv-column'));
+      }
+      body = content.children[content.children.length - 2 + lane];
+    }
     parents = [];
     copies = [body];
   };
@@ -296,7 +313,11 @@ function paginatePreview(paper, content) {
   const place = parts => {
     const hadContent = body.hasChildNodes();
     const added = parts.map(([path, element]) => append(path, element));
-    if (hadContent && page.offsetHeight > page.clientWidth * 297 / 210 + 1) {
+    const pageHeight = page.clientWidth * 297 / 210;
+    const usedHeight = lane < 0 ? page.offsetHeight
+      : body.getBoundingClientRect().bottom - page.getBoundingClientRect().top
+        + parseFloat(page.ownerDocument.defaultView.getComputedStyle(page).paddingBottom);
+    if (hadContent && usedHeight > pageHeight + 1) {
       for (const element of added.reverse()) {
         let parent = element.parentNode;
         element.remove();
@@ -311,39 +332,60 @@ function paginatePreview(paper, content) {
     }
   };
 
-  paper.replaceChildren();
-  addPage();
-  for (const block of content.children) {
-    if (!block.matches('.cv-section')) {
-      place([[[], block]]);
-      continue;
-    }
-    const probe = node('div', undefined, 'preview-page');
-    const probeBody = node('div', undefined, 'preview-page-content');
-    probeBody.append(block.cloneNode(true));
-    probe.append(probeBody);
-    paper.append(probe);
-    const fits = probe.offsetHeight <= probe.clientWidth * 297 / 210 + 1;
-    probe.remove();
-    if (fits) {
-      place([[[], block]]);
-      continue;
-    }
-    let pending = [[[block], block.firstElementChild]];
-    for (const entry of Array.from(block.children).slice(1)) {
-      for (const child of entry.children) {
-        const path = [block, entry];
-        if (child.matches('div.cv-line') && child.nextElementSibling) {
-          pending.push([path, child]);
+  const placeBlocks = blocks => {
+    for (const block of blocks) {
+      if (!block.matches('.cv-section')) {
+        place([[[], block]]);
+        continue;
+      }
+      if (!columns) {
+        const probe = node('div', undefined, 'preview-page');
+        const probeBody = node('div', undefined, 'preview-page-content');
+        probeBody.append(block.cloneNode(true));
+        probe.append(probeBody);
+        paper.append(probe);
+        const fits = probe.offsetHeight <= probe.clientWidth * 297 / 210 + 1;
+        probe.remove();
+        if (fits) {
+          place([[[], block]]);
           continue;
         }
-        for (const part of child.matches('ul') ? child.children : [child]) {
-          const partPath = part === child ? path : [...path, child];
-          place([...pending, [partPath, part]]);
-          pending = [];
+      }
+      let pending = [[[block], block.firstElementChild]];
+      for (const entry of Array.from(block.children).slice(1)) {
+        for (const child of entry.children) {
+          const path = [block, entry];
+          if (child.matches('div.cv-line') && child.nextElementSibling) {
+            pending.push([path, child]);
+            continue;
+          }
+          for (const part of child.matches('ul') ? child.children : [child]) {
+            const partPath = part === child ? path : [...path, child];
+            place([...pending, [partPath, part]]);
+            pending = [];
+          }
         }
       }
     }
+  };
+
+  paper.replaceChildren();
+  addPage();
+  const blocks = Array.from(content.children);
+  if (!columns) {
+    placeBlocks(blocks);
+    return;
+  }
+
+  const [head, summary, ...sections] = blocks;
+  placeBlocks([head, summary]);
+  const firstSectionPage = pageIndex;
+  for (lane = 0; lane < 2; lane++) {
+    const sectionsInColumn = sections.filter((_, index) => index % 2 === lane);
+    if (!sectionsInColumn.length) continue;
+    pageIndex = firstSectionPage - 1;
+    addPage();
+    placeBlocks(sectionsInColumn);
   }
 }
 

@@ -87,6 +87,7 @@ dialog .entry{margin:0}
 .paper[data-template=modern] .cv-head{text-align:left;border-left:.28em solid var(--accent);padding-left:.7em}
 .paper[data-template=modern] .cv-section h2{color:var(--accent);border-color:var(--accent);letter-spacing:.12em}
 .paper[data-template=columns] .preview-page-content{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:1.5em;align-items:start}
+.cv-column{display:flow-root}
 .paper[data-template=columns] .cv-head,.paper[data-template=columns] .summary{grid-column:1/-1}
 .paper[data-template=columns] .cv-section h2{color:var(--accent)}
 .paper[data-template=ats] .cv-head{text-align:left}
