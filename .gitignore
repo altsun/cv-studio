@@ -4,3 +4,8 @@
 
 .vercel
 .env*
+
+# Generated test artifacts
+/.cv-*.pdf
+/.cv-lighthouse.json
+/.cv-expected.txt
