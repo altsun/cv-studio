@@ -8,6 +8,8 @@ body{margin:0}
 button,input,textarea,select{font:inherit;color:inherit}
 button{padding:7px 12px;border:1px solid var(--line);border-radius:7px;background:#fff;cursor:pointer;font-weight:600}
 button:hover{background:#eff5ff;border-color:#849fc9}
+button.danger{color:#a02c33}
+button.danger:hover:not(:disabled){background:#fff0f1;border-color:#a02c33}
 button:disabled{opacity:.45;cursor:default}
 button.primary{background:var(--blue);border-color:var(--blue);color:white}
 button.primary:hover{background:#173969}
@@ -26,7 +28,7 @@ details[open] summary{margin-bottom:12px}
 .entry:first-of-type{margin-top:12px}
 .row>*{flex:1 1 115px}
 .preview{padding:22px clamp(12px,4vw,50px) 48px;min-width:0}
-.preview-bar{max-width:794px;margin:0 auto 9px;display:flex;justify-content:space-between;align-items:center}
+.preview-bar{max-width:794px;margin:0 auto 9px;display:flex;justify-content:space-between;align-items:center;gap:8px}
 .preview-bar h2{margin:0;font-size:15px}.preview-bar a{font-size:13px;color:var(--blue)}
 .paper{background:#fff;max-width:794px;aspect-ratio:210/297;margin:auto;padding:3.4%;box-shadow:0 6px 24px #1c3a5a24;color:#202c3c;font:11px/1.43 Arial,sans-serif;overflow-wrap:anywhere}
 .paper.pdf-paper{aspect-ratio:auto;padding:0;background:none;box-shadow:none}
@@ -47,8 +49,10 @@ details[open] summary{margin-bottom:12px}
 .paper .item-text{padding-left:10px}
 dialog{border:1px solid var(--line);border-radius:13px;padding:20px;width:min(530px,calc(100% - 24px));max-height:85vh;color:inherit}
 dialog::backdrop{background:#122b4c75}
-dialog h2{font-size:20px;margin:0 0 12px}
-dialog .entry{margin-bottom:10px}
+#dialog-body{display:grid;gap:10px;justify-items:stretch}
+#dialog-body>button{justify-self:start}
+dialog h2{font-size:20px;margin:0}
+dialog .entry{margin:0}
 .error{color:#a02c33}
 @media(max-width:800px){main{grid-template-columns:1fr}.editor{border-right:0}}
 @media(max-width:440px){.bar{align-items:flex-start}.bar .actions{justify-content:flex-end}.bar button{font-size:12px;padding:5px 7px}.brand{font-size:13px}}
