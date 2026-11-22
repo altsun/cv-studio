@@ -35,7 +35,8 @@ export function suggestVersion(versions) {
 const hasStrings = (object, keys) => object && keys.every(key => typeof object[key] === 'string');
 
 export function isCV(cv) {
-  return hasStrings(cv, ['name', 'role', 'contacts', 'summary']) && Array.isArray(cv.sections)
+  return hasStrings(cv, ['name', 'role', 'contacts', 'summary']) && (cv.sourcePDF === undefined || (typeof cv.sourcePDF === 'string'
+      && cv.sourcePDF.startsWith('data:application/pdf;base64,'))) && Array.isArray(cv.sections)
     && cv.sections.every(section => hasStrings(section, ['title']) && typeof section.hidden === 'boolean'
       && Array.isArray(section.entries) && section.entries.every(entry => hasStrings(entry, Object.keys(emptyEntry()))));
 }

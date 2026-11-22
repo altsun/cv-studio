@@ -20,6 +20,7 @@ try {
   // Start with the sample if local storage is unavailable or contains invalid data.
 }
 
+const editablePreviews = new WeakSet();
 const active = () => state.documents.find(doc => doc.id === state.active);
 const node = (tag, text, className) => {
   const element = document.createElement(tag);
@@ -55,7 +56,10 @@ function field(label, value, update, multiline = false) {
   input.addEventListener('input', () => {
     update(input.value);
     persist();
-    renderPreview(active().draft);
+    if (!wrapper.closest('dialog')) {
+      editablePreviews.add(active().draft);
+      renderPreview(active().draft);
+    }
   });
   wrapper.append(input);
   return wrapper;
@@ -93,7 +97,7 @@ function renderEditor(openSections = []) {
     const move = offset => {
       const target = index + offset;
       [cv.sections[index], cv.sections[target]] = [cv.sections[target], cv.sections[index]];
-      refresh([target]);
+      refreshEdit([target]);
     };
     const up = button('Lên', () => move(-1));
     const down = button('Xuống', () => move(1));
@@ -101,11 +105,11 @@ function renderEditor(openSections = []) {
     down.disabled = index === cv.sections.length - 1;
     controls.append(up, down, button(section.hidden ? 'Hiện mục' : 'Ẩn mục', () => {
       section.hidden = !section.hidden;
-      refresh([index]);
+      refreshEdit([index]);
     }), button('Xóa mục', () => {
       if (confirm('Xóa mục này khỏi bản nháp?')) {
         cv.sections.splice(index, 1);
-        refresh();
+        refreshEdit();
       }
     }));
     card.append(heading, title, controls);
@@ -119,13 +123,13 @@ function renderEditor(openSections = []) {
         button('Xóa dòng', () => {
           if (confirm('Xóa dòng này khỏi bản nháp?')) {
             section.entries.splice(entryIndex, 1);
-            refresh([index]);
+            refreshEdit([index]);
           }
         }));
       card.append(item);
     });
     card.append(node('p', 'Dùng “- ” cho gạch đầu dòng, **chữ** để in đậm và [tên](https://…) cho liên kết.', 'muted'),
-      button('+ Thêm dòng', () => { section.entries.push(emptyEntry()); refresh([index]); }));
+      button('+ Thêm dòng', () => { section.entries.push(emptyEntry()); refreshEdit([index]); }));
     fields.append(card);
   });
 }
@@ -149,8 +153,30 @@ function inline(element, text) {
   element.append(text.slice(cursor));
 }
 
-function renderPreview(cv) {
+function renderPreview(cv, original = Boolean(cv.sourcePDF) && !editablePreviews.has(cv)) {
   const paper = $('paper');
+  const controls = $('preview-controls');
+  controls.replaceChildren();
+  if (cv.sourcePDF) {
+    controls.append(button(original ? 'Bản chỉnh sửa' : 'PDF gốc', () => {
+      if (original) editablePreviews.add(cv);
+      else editablePreviews.delete(cv);
+      renderPreview(cv);
+    }));
+  }
+  paper.classList.toggle('pdf-paper', original);
+  if (original) {
+    const download = node('a', 'Tải PDF gốc');
+    download.href = cv.sourcePDF;
+    download.download = (cv.name || 'CV') + '.pdf';
+    controls.append(download);
+    const pages = node('div');
+    paper.replaceChildren(pages);
+    renderPDF(cv.sourcePDF, pages).catch(() => {
+      pages.replaceChildren(node('p', 'Không thể hiển thị PDF. Bạn có thể tải PDF gốc để xem.'));
+    });
+    return;
+  }
   const head = node('div', undefined, 'cv-head');
   const contact = node('div', undefined, 'contacts');
   inline(contact, cv.contacts);
@@ -192,6 +218,11 @@ function renderPreview(cv) {
   }
 }
 
+function refreshEdit(openSections) {
+  editablePreviews.add(active().draft);
+  refresh(openSections);
+}
+
 function refresh(openSections) {
   persist();
   renderEditor(openSections);
@@ -214,7 +245,7 @@ function exportPDF(version) {
   const originalTitle = document.title;
   const filename = [version.cv.name, version.cv.role, version.label].filter(Boolean).join('-');
   document.title = filename.replace(/[<>:"/\\|?*\u0000-\u001f]/gu, '-').replace(/\s+/gu, '_');
-  renderPreview(version.cv);
+  renderPreview(version.cv, false);
   window.addEventListener('afterprint', () => {
     document.title = originalTitle;
     renderPreview(active().draft);
@@ -289,10 +320,43 @@ function showVersions(print = false) {
     ...(versions.length ? versions : [node('p', 'Chưa có phiên bản đã lưu.', 'muted')]));
 }
 
-async function pdfText(file) {
+async function loadPDF(data) {
   const pdfjs = await import('./vendor/pdf.mjs');
   pdfjs.GlobalWorkerOptions.workerSrc = new URL('./vendor/pdf.worker.mjs', import.meta.url).href;
-  const task = pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()), isEvalSupported: false });
+  return pdfjs.getDocument({ data, isEvalSupported: false });
+}
+
+async function renderPDF(source, container) {
+  const task = await loadPDF(await (await fetch(source)).arrayBuffer());
+  try {
+    const pdf = await task.promise;
+    for (let number = 1; number <= pdf.numPages && container.isConnected; number++) {
+      const page = await pdf.getPage(number);
+      const viewport = page.getViewport({ scale: 2 });
+      const canvas = node('canvas');
+      canvas.width = Math.ceil(viewport.width);
+      canvas.height = Math.ceil(viewport.height);
+      canvas.setAttribute('role', 'img');
+      canvas.setAttribute('aria-label', 'Trang ' + number);
+      await page.render({ canvas, viewport }).promise;
+      container.append(canvas);
+    }
+  } finally {
+    await task.destroy();
+  }
+}
+
+function readPDFSource(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve('data:application/pdf;base64,' + reader.result.split(',')[1]);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+async function pdfText(file) {
+  const task = await loadPDF(await file.arrayBuffer());
   try {
     const pdf = await task.promise;
     const pages = [];
@@ -307,22 +371,30 @@ async function pdfText(file) {
   }
 }
 
-function reviewImport(file, text) {
-  if (!text.trim()) throw new Error('Không tìm thấy văn bản trong tệp. PDF scan cần OCR trước khi nhập.');
+function reviewImport(file, text, sourcePDF) {
+  if (!text.trim() && !sourcePDF) throw new Error('Không tìm thấy văn bản trong tệp.');
+  const importedCV = () => {
+    const cv = fromText(source);
+    if (sourcePDF) cv.sourcePDF = sourcePDF;
+    return cv;
+  };
   let source = text;
   const title = file.name.replace(/\.[^.]+$/u, '');
   const review = field('Rà soát văn bản trích xuất', source, value => { source = value; }, true);
   review.querySelector('textarea').rows = 9;
   showDialog('Rà soát CV nhập',
-    node('p', 'Kiểm tra tiêu đề mục, xuống dòng và ngày tháng. Bạn có thể sắp xếp lại các trường sau khi nhập.', 'muted'),
+    node('p', sourcePDF
+      ? (text.trim() ? 'Ứng dụng giữ bố cục PDF gốc. Bạn có thể rà soát văn bản dùng cho bản chỉnh sửa.'
+        : 'Ứng dụng giữ bố cục PDF gốc. Tệp này cần OCR để trích văn bản có thể chỉnh sửa.')
+      : 'Kiểm tra tiêu đề mục, xuống dòng và ngày tháng. Bạn có thể sắp xếp lại các trường sau khi nhập.', 'muted'),
     review,
     button('Tạo CV riêng từ tệp', () => {
       $('dialog').close();
-      addDocument(createDocument(title, fromText(source)));
+      addDocument(createDocument(title, importedCV()));
     }, true),
     button('Thêm phiên bản vào CV đang mở', () => {
       const doc = active();
-      showDialog('Đặt số cho phiên bản nhập', versionForm('Lưu phiên bản nhập', () => refresh(), doc, fromText(source)));
+      showDialog('Đặt số cho phiên bản nhập', versionForm('Lưu phiên bản nhập', () => refresh(), doc, importedCV()));
     }));
 }
 
@@ -335,7 +407,7 @@ $('save').onclick = () => showDialog('Lưu phiên bản', versionForm('Lưu phi�
 $('add-section').onclick = () => {
   const sections = active().draft.sections;
   sections.push({ title: 'Mục mới', hidden: false, entries: [emptyEntry()] });
-  refresh([sections.length - 1]);
+  refreshEdit([sections.length - 1]);
   $('fields').lastElementChild.scrollIntoView({ block: 'nearest' });
 };
 $('backup').onclick = () => {
@@ -364,7 +436,12 @@ $('file').onchange = async event => {
     } else {
       const isPDF = /\.pdf$/iu.test(file.name);
       status('Đang đọc tệp…');
-      reviewImport(file, isPDF ? await pdfText(file) : await file.text());
+      if (isPDF) {
+        const [text, sourcePDF] = await Promise.all([pdfText(file), readPDFSource(file)]);
+        reviewImport(file, text, sourcePDF);
+      } else {
+        reviewImport(file, await file.text());
+      }
       status('Đã đọc tệp. Nội dung sẵn sàng để rà soát.');
     }
   } catch (failure) {
