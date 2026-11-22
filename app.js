@@ -1,3 +1,4 @@
+import { extractPDFPage } from './pdf-import.js';
 import { createDocument, emptyEntry, fromText, isBackup, saveVersion, suggestVersion } from './model.js';
 
 const $ = id => document.getElementById(id);
@@ -142,7 +143,10 @@ function inline(element, text) {
     if (match[3]) {
       element.append(node('strong', match[3]));
     } else {
-      const link = node('a', match[1] || match[4]);
+      const link = node('a');
+      for (const [index, part] of (match[1] || match[4]).split(/\*\*([^*\n]+)\*\*/gu).entries()) {
+        link.append(index % 2 ? node('strong', part) : part);
+      }
       link.href = match[2] || (/^https?:/i.test(match[4]) ? match[4] : 'mailto:' + match[4]);
       link.target = '_blank';
       link.rel = 'noopener noreferrer';
@@ -320,10 +324,10 @@ function showVersions(print = false) {
     ...(versions.length ? versions : [node('p', 'Chưa có phiên bản đã lưu.', 'muted')]));
 }
 
-async function loadPDF(data) {
+async function loadPDF(data, fontExtraProperties = false) {
   const pdfjs = await import('./vendor/pdf.mjs');
   pdfjs.GlobalWorkerOptions.workerSrc = new URL('./vendor/pdf.worker.mjs', import.meta.url).href;
-  return pdfjs.getDocument({ data, isEvalSupported: false });
+  return pdfjs.getDocument({ data, isEvalSupported: false, fontExtraProperties });
 }
 
 async function renderPDF(source, container) {
@@ -356,14 +360,13 @@ function readPDFSource(file) {
 }
 
 async function pdfText(file) {
-  const task = await loadPDF(await file.arrayBuffer());
+  const task = await loadPDF(await file.arrayBuffer(), true);
   try {
     const pdf = await task.promise;
     const pages = [];
     for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
       const page = await pdf.getPage(pageNumber);
-      const { items } = await page.getTextContent();
-      pages.push(items.map(item => (item.str ?? '') + (item.hasEOL ? '\n' : '')).join(''));
+      pages.push(await extractPDFPage(page));
     }
     return pages.join('\n');
   } finally {
@@ -371,11 +374,11 @@ async function pdfText(file) {
   }
 }
 
-function reviewImport(file, text, sourcePDF) {
+function reviewImport(file, text, sourcePDF, isPDF = false) {
   if (!text.trim() && !sourcePDF) throw new Error('Không tìm thấy văn bản trong tệp.');
   const importedCV = () => {
     const cv = fromText(source);
-    if (sourcePDF) cv.sourcePDF = sourcePDF;
+    if (sourcePDF && !source.trim()) cv.sourcePDF = sourcePDF;
     return cv;
   };
   let source = text;
@@ -383,8 +386,8 @@ function reviewImport(file, text, sourcePDF) {
   const review = field('Rà soát văn bản trích xuất', source, value => { source = value; }, true);
   review.querySelector('textarea').rows = 9;
   showDialog('Rà soát CV nhập',
-    node('p', sourcePDF
-      ? (text.trim() ? 'Ứng dụng giữ bố cục PDF gốc. Bạn có thể rà soát văn bản dùng cho bản chỉnh sửa.'
+    node('p', isPDF
+      ? (text.trim() ? 'Rà soát dấu đầu dòng, chữ đậm và liên kết trước khi lưu thành CV Studio.'
         : 'Ứng dụng giữ bố cục PDF gốc. Tệp này cần OCR để trích văn bản có thể chỉnh sửa.')
       : 'Kiểm tra tiêu đề mục, xuống dòng và ngày tháng. Bạn có thể sắp xếp lại các trường sau khi nhập.', 'muted'),
     review,
@@ -437,8 +440,8 @@ $('file').onchange = async event => {
       const isPDF = /\.pdf$/iu.test(file.name);
       status('Đang đọc tệp…');
       if (isPDF) {
-        const [text, sourcePDF] = await Promise.all([pdfText(file), readPDFSource(file)]);
-        reviewImport(file, text, sourcePDF);
+        const text = await pdfText(file);
+        reviewImport(file, text, text.trim() ? undefined : await readPDFSource(file), true);
       } else {
         reviewImport(file, await file.text());
       }

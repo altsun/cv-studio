@@ -25,3 +25,18 @@ test('text import preserves headings, contact information and bullets', () => {
   assert.equal(cv.contacts, 'an@example.com');
   assert.equal(cv.sections[0].entries[0].body, '- Built APIs');
 });
+
+test('formatted import keeps rich text inside editable CV sections', () => {
+  const cv = fromText([
+    '**An - Engineer**',
+    '[GitHub](https://github.com/example)',
+    '**WORK EXPERIENCE**',
+    '**Project**',
+    '- Built [**the API**](https://example.com/api).',
+  ].join('\n'));
+  assert.equal(cv.name, 'An');
+  assert.equal(cv.role, 'Engineer');
+  assert.equal(cv.contacts, '[GitHub](https://github.com/example)');
+  assert.equal(cv.sections[0].title, 'WORK EXPERIENCE');
+  assert.equal(cv.sections[0].entries[0].body, '**Project**\n- Built [**the API**](https://example.com/api).');
+});

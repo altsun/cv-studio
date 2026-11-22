@@ -51,14 +51,15 @@ export function isBackup(backup) {
 export function fromText(text) {
   const lines = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
   const cv = emptyCV();
-  [cv.name, cv.role = ''] = (lines.shift() || '').split(/\s+[-–|]\s+(.+)/u, 2);
+  [cv.name, cv.role = ''] = (lines.shift() || '').replace(/^\*\*(.+)\*\*$/u, '$1').split(/\s+[-–|]\s+(.+)/u, 2);
   cv.sections = [];
   const headings = /^(work experience|experience|professional experience|projects|skills|technical skills|certifications|education|languages|awards|kinh nghiệm|dự án|kỹ năng|chứng chỉ|học vấn|ngoại ngữ|kinh nghiệm làm việc)$/iu;
   let section;
   const summary = [];
   for (const line of lines) {
-    if (headings.test(line)) {
-      section = { title: line, hidden: false, entries: [emptyEntry()] };
+    const heading = line.replace(/^\*\*(.+)\*\*$/u, '$1');
+    if (headings.test(heading)) {
+      section = { title: heading, hidden: false, entries: [emptyEntry()] };
       cv.sections.push(section);
     } else if (section) {
       const entry = section.entries[0];
