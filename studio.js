@@ -221,6 +221,58 @@ export function installExtras({ active, addDocument, showDialog, render }) {
     }
   }
 
+  $('analyze').onclick = () => {
+    const cv = active()?.draft;
+    if (!cv) return;
+
+    const prompt = element('textarea', '');
+    prompt.rows = 10;
+    prompt.value = [
+      translate('Phân tích CV dưới đây. Nêu điểm mạnh, các vấn đề theo thứ tự ưu tiên và đề xuất cách viết lại cụ thể. Nếu có mô tả công việc, hãy đối chiếu yêu cầu với kinh nghiệm và chỉ ra các từ khóa còn thiếu. Giữ nguyên sự thật, không bịa kinh nghiệm hay số liệu. Trả lời bằng tiếng Việt.'),
+      [cv.role, cv.summary].map(value => value.trim()).filter(Boolean).join('\n\n'),
+      ...cv.sections.filter(section => !section.hidden).map(section => {
+        const entries = section.entries.map(entry =>
+          [entry.title, entry.organization, entry.date, entry.location, entry.body]
+            .map(value => value.trim()).filter(Boolean).join('\n')).filter(Boolean);
+        return entries.length ? [section.title, ...entries].join('\n\n') : '';
+      }),
+    ].filter(Boolean).join('\n\n');
+
+    const label = element('label', 'Nội dung gửi cho AI');
+    label.append(prompt);
+    const status = element('p', '');
+    status.setAttribute('role', 'status');
+    const copy = button('Sao chép yêu cầu', async () => {
+      try {
+        await navigator.clipboard.writeText(prompt.value);
+        status.textContent = translate('Đã sao chép. Hãy dán nội dung vào công cụ AI bạn chọn.');
+      } catch {
+        prompt.focus();
+        prompt.select();
+        status.textContent = translate('Hãy sao chép vùng văn bản đã chọn.');
+      }
+    });
+
+    const providers = element('div', '');
+    providers.className = 'actions ai-providers';
+    for (const [name, href, icon] of [
+      ['ChatGPT', 'https://chatgpt.com/', 'chatgpt.png'],
+      ['Codex', 'https://chatgpt.com/codex/tasks', 'codex.webp'],
+      ['Claude', 'https://claude.ai/new', 'claude.png'],
+      ['Gemini', 'https://gemini.google.com/app', 'gemini.png'],
+    ]) {
+      const link = Object.assign(element('a', name), { href, target: '_blank', rel: 'noopener noreferrer' });
+      const image = element('img');
+      Object.assign(image, { src: './ai-icons/' + icon, alt: '', width: 18, height: 18 });
+      link.prepend(image);
+      providers.append(link);
+    }
+
+    showDialog('Phân tích CV bằng AI',
+      element('p', 'Bạn có thể chỉnh nội dung, thêm mô tả công việc và kiểm tra thông tin cá nhân trước khi sao chép, rồi dán vào công cụ AI bạn chọn.'),
+      label, copy, providers, status);
+  };
+
   $('job').onclick = () => {
     if (!active()) return;
     const description = element('textarea', '');

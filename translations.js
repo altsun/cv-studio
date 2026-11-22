@@ -91,6 +91,13 @@ Vị trí ứng tuyển|Target role
 Tạo CV cho vị trí này|Create resume for this role
 Gạch đầu dòng cần rà soát|Bullet points to review
 Ngôn ngữ nội dung|Content language
+Phân tích CV bằng AI|Analyze resume with AI
+Nội dung gửi cho AI|Content to share with AI
+Sao chép yêu cầu|Copy prompt
+Đã sao chép. Hãy dán nội dung vào công cụ AI bạn chọn.|Copied. Paste the prompt into your chosen AI tool.
+Hãy sao chép vùng văn bản đã chọn.|Copy the selected text.
+Bạn có thể chỉnh nội dung, thêm mô tả công việc và kiểm tra thông tin cá nhân trước khi sao chép, rồi dán vào công cụ AI bạn chọn.|Edit the content, add a job description, and review personal information before copying and pasting into your chosen AI tool.
+Phân tích CV dưới đây. Nêu điểm mạnh, các vấn đề theo thứ tự ưu tiên và đề xuất cách viết lại cụ thể. Nếu có mô tả công việc, hãy đối chiếu yêu cầu với kinh nghiệm và chỉ ra các từ khóa còn thiếu. Giữ nguyên sự thật, không bịa kinh nghiệm hay số liệu. Trả lời bằng tiếng Việt.|Review the resume below. Identify its strengths, prioritize issues, and suggest specific rewrites. If a job description is included, compare its requirements with the applicant's experience and identify missing keywords. Preserve the facts and do not invent experience or metrics. Reply in English.
 Gợi ý viết lại bằng AI|Rewrite with AI
 Kiểm tra chính tả bằng AI|Proofread with AI
 Đang tải mô hình AI|Downloading AI model

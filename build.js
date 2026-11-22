@@ -1,4 +1,4 @@
-import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { cp, copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { examples } from './examples.js';
 
 const domain = 'https://cv-studio-phi.vercel.app';
@@ -49,6 +49,7 @@ const html = await readFile('index.html', 'utf8');
 await mkdir('dist/vendor', { recursive: true });
 await Promise.all([
   writeFile('dist/index.html', html.replace('<html lang="vi">', '<html lang="vi" data-analytics-script="' + script + '" data-analytics-endpoint="' + endpoint + '" data-analytics-view="' + viewEndpoint + '">')),
+  cp('ai-icons', 'dist/ai-icons', { recursive: true }),
   ...assets.map(file => copyFile(file, 'dist/' + file)),
   copyFile('node_modules/pdfjs-dist/build/pdf.min.mjs', 'dist/vendor/pdf.mjs'),
   copyFile('node_modules/pdfjs-dist/build/pdf.worker.min.mjs', 'dist/vendor/pdf.worker.mjs'),

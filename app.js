@@ -144,7 +144,7 @@ function renderEditor(openSections = []) {
   const doc = active();
   const documents = $('documents');
   documents.replaceChildren(...state.documents.map(item => new Option(item.label || translate('CV chưa đặt tên'), item.id)));
-  for (const id of ['documents', 'duplicate', 'delete', 'backup', 'history', 'save', 'export', 'add-section', 'job', 'share']) {
+  for (const id of ['documents', 'duplicate', 'delete', 'backup', 'history', 'save', 'export', 'add-section', 'job', 'analyze', 'share']) {
     $(id).disabled = !doc;
   }
   const fields = $('fields');

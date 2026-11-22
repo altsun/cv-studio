@@ -59,6 +59,7 @@ details[open] summary{margin-bottom:12px}
 dialog{border:1px solid var(--line);border-radius:13px;padding:20px;width:min(530px,calc(100% - 24px));max-height:85vh;color:inherit}
 dialog::backdrop{background:#122b4c75}
 #dialog-body{display:grid;gap:10px;justify-items:stretch}
+.ai-providers a{display:inline-flex;gap:6px;align-items:center;padding:4px}
 #dialog-body>button{justify-self:start}
 dialog h2{font-size:20px;margin:0}
 dialog .entry{margin:0}
