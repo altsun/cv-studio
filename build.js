@@ -2,7 +2,7 @@ import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { examples } from './examples.js';
 
 const domain = 'https://cv-studio-phi.vercel.app';
-const assets = [ 'style.css', 'app.js', 'model.js', 'pdf-import.js', 'studio.js', 'translations.js', 'examples.js', 'og.png'];
+const assets = ['style.css', 'app.js', 'model.js', 'pdf-import.js', 'studio.js', 'translations.js', 'examples.js', 'og.png'];
 const industry = examples.map(example => {
   const path = '/mau-cv/' + example.slug + '/';
   const title = 'Mẫu CV ' + example.title;
@@ -28,12 +28,14 @@ try {
   // Static builds work without Vercel Analytics configuration.
 }
 const analyticsPath = path => typeof path === 'string' && /^\/[a-zA-Z0-9_./-]+$/u.test(path) ? path : '';
-const script = analyticsPath(analytics?.scriptSrc);
+const production = process.env.VERCEL_ENV === 'production';
+const script = production ? analyticsPath(analytics?.scriptSrc) || '/_vercel/insights/script.js' : '';
 const endpoint = analyticsPath(analytics?.eventEndpoint);
+const viewEndpoint = analyticsPath(analytics?.viewEndpoint);
 const html = await readFile('index.html', 'utf8');
 await mkdir('dist/vendor', { recursive: true });
 await Promise.all([
-  writeFile('dist/index.html', html.replace('<html lang="vi">', '<html lang="vi" data-analytics-script="' + script + '" data-analytics-endpoint="' + endpoint + '">')),
+  writeFile('dist/index.html', html.replace('<html lang="vi">', '<html lang="vi" data-analytics-script="' + script + '" data-analytics-endpoint="' + endpoint + '" data-analytics-view="' + viewEndpoint + '">')),
   ...assets.map(file => copyFile(file, 'dist/' + file)),
   copyFile('node_modules/pdfjs-dist/build/pdf.min.mjs', 'dist/vendor/pdf.mjs'),
   copyFile('node_modules/pdfjs-dist/build/pdf.worker.min.mjs', 'dist/vendor/pdf.worker.mjs'),

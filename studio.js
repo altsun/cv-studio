@@ -12,15 +12,21 @@ function button(text, action) {
 }
 
 const defaults = { template: 'classic', color: '#214c92', size: 11, spacing: 1.43, margin: 13 };
-const templates = { classic: 'Đơn giản', modern: 'Hiện đại', columns: 'Hai cột', ats: 'Tối ưu ATS' };
-const metrics = { size: [9, 15, 0.5], spacing: [1.1, 1.9, 0.05], margin: [7, 24, 1] };
+const templates = { classic: 'Đơn giản', nodeflair: 'NodeFlair (gốc)', modern: 'Hiện đại', columns: 'Hai cột', ats: 'Tối ưu ATS' };
+const metrics = { size: [8, 15, 0.1], spacing: [1.1, 1.9, 0.05], margin: [7, 24, 1] };
+
+function templateDefaults(template) {
+  return template === 'nodeflair' ? { ...defaults, template, color: '#202c3c', size: 8.4, margin: 9 } : { ...defaults, template };
+}
 
 function appearance(cv) {
-  const options = { ...defaults, ...cv?.appearance };
-  if (!Object.hasOwn(templates, options.template)) options.template = defaults.template;
-  if (!/^#[a-f0-9]{6}$/i.test(options.color)) options.color = defaults.color;
+  const saved = cv?.appearance;
+  const template = Object.hasOwn(templates, saved?.template) ? saved.template : defaults.template;
+  const base = templateDefaults(template);
+  const options = { ...base, ...saved, template };
+  if (!/^#[a-f0-9]{6}$/i.test(options.color)) options.color = base.color;
   for (const [key, [min, max]] of Object.entries(metrics)) {
-    if (!Number.isFinite(options[key]) || options[key] < min || options[key] > max) options[key] = defaults[key];
+    if (!Number.isFinite(options[key]) || options[key] < min || options[key] > max) options[key] = base[key];
   }
   return options;
 }
@@ -38,7 +44,7 @@ export function addAppearance(cv, update) {
   const panel = element('div', '');
   panel.className = 'card appearance';
   panel.append(element('h2', 'Bố cục CV'));
-  const options = appearance(cv);
+  let options = appearance(cv);
   const controls = {
     template: ['Mẫu CV', element('select', '')],
     color: ['Màu chủ đạo', Object.assign(element('input', ''), { type: 'color' })],
@@ -56,9 +62,20 @@ export function addAppearance(cv, update) {
         control.value = options[key];
         return;
       }
-      options[key] = Object.hasOwn(metrics, key) ? control.valueAsNumber : control.value;
-      cv.appearance = { ...options };
-      if (key === 'template') track('template');
+      const value = Object.hasOwn(metrics, key) ? control.valueAsNumber : control.value;
+      if (value === options[key]) return;
+      if (key === 'template') {
+        const previous = templateDefaults(options.template);
+        const overrides = Object.fromEntries(Object.entries(options)
+          .filter(([name, current]) => name !== 'template' && current !== previous[name]));
+        cv.appearance = { ...overrides, template: value };
+        options = appearance(cv);
+        for (const [name, [, input]] of Object.entries(controls)) input.value = options[name];
+        track('template');
+      } else {
+        options[key] = value;
+        cv.appearance = { ...options };
+      }
       update();
     };
     label.append(control);
@@ -97,31 +114,38 @@ export function compareCV(saved, draft) {
 const analyticsKey = 'cv-studio-metrics';
 const events = ['create', 'export', 'template'];
 let analyticsScript;
-function sendMetric(event) {
-  const { analyticsScript: source, analyticsEndpoint } = document.documentElement.dataset;
-  if (!source) return;
-  if (!analyticsScript) {
-    globalThis.va ??= (...args) => { (globalThis.vaq ??= []).push(args); };
-    globalThis.va('beforeSend', entry => {
-      if (entry.type !== 'event') return null;
-      return { ...entry, url: new URL(location.pathname, location.origin).href };
-    });
-    analyticsScript = document.createElement('script');
-    analyticsScript.src = source;
-    analyticsScript.defer = true;
-    if (analyticsEndpoint) analyticsScript.dataset.eventEndpoint = analyticsEndpoint;
-    document.head.append(analyticsScript);
+const hostedAnalytics = Boolean(document.documentElement.dataset.analyticsScript);
+function metricsEnabled() {
+  try {
+    const value = localStorage.getItem(analyticsKey);
+    return value === null ? hostedAnalytics : value !== 'false';
+  } catch {
+    return false;
   }
-  globalThis.va('event', { name: 'resume_' + event });
+}
+
+function startAnalytics() {
+  if (!hostedAnalytics || analyticsScript || !metricsEnabled()) return;
+  const { analyticsScript: source, analyticsEndpoint, analyticsView } = document.documentElement.dataset;
+  globalThis.va ??= (...args) => { (globalThis.vaq ??= []).push(args); };
+  globalThis.va('beforeSend', entry => metricsEnabled()
+    ? { ...entry, url: new URL(location.pathname, location.origin).href }
+    : null);
+  analyticsScript = document.createElement('script');
+  analyticsScript.src = source;
+  analyticsScript.defer = true;
+  if (analyticsEndpoint) analyticsScript.dataset.eventEndpoint = analyticsEndpoint;
+  if (analyticsView) analyticsScript.dataset.viewEndpoint = analyticsView;
+  document.head.append(analyticsScript);
 }
 export function track(event) {
+  if (!events.includes(event) || !metricsEnabled()) return;
+  startAnalytics();
+  if (hostedAnalytics) globalThis.va('event', { name: 'resume_' + event });
   try {
-    const metrics = JSON.parse(localStorage.getItem(analyticsKey));
-    if (metrics && events.includes(event)) {
-      metrics[event] = (metrics[event] || 0) + 1;
-      localStorage.setItem(analyticsKey, JSON.stringify(metrics));
-      sendMetric(event);
-    }
+    const metrics = JSON.parse(localStorage.getItem(analyticsKey)) || {};
+    metrics[event] = (metrics[event] || 0) + 1;
+    localStorage.setItem(analyticsKey, JSON.stringify(metrics));
   } catch {
     // Optional metrics must never interrupt editing.
   }
@@ -147,6 +171,7 @@ function jobMatch(cv, description) {
 }
 
 export function installExtras({ active, addDocument, showDialog, render }) {
+  startAnalytics();
   $('language').value = language();
   $('language').onchange = () => { setLanguage($('language').value); render(); };
   const layout = $('workspace');
@@ -272,15 +297,15 @@ export function installExtras({ active, addDocument, showDialog, render }) {
   $('metrics').onclick = () => {
     const open = () => {
       try {
-        const metrics = JSON.parse(localStorage.getItem(analyticsKey));
+        const metrics = metricsEnabled() ? JSON.parse(localStorage.getItem(analyticsKey)) || {} : null;
         const summary = metrics
           ? [translate('Tạo CV') + ' ' + (metrics.create || 0), translate('Xuất PDF') + ' ' + (metrics.export || 0), translate('Đổi mẫu') + ' ' + (metrics.template || 0)].join(' · ')
           : translate('Đo lường đang tắt.');
         showDialog('Đo lường', element('p', document.documentElement.dataset.analyticsScript
-          ? 'Khi bật, các sự kiện tạo CV, đổi mẫu và yêu cầu in được gửi ẩn danh. Nội dung CV không được gửi.'
+          ? 'Khi bật, Vercel Analytics nhận lượt truy cập, tạo CV, đổi mẫu và yêu cầu in. Nội dung CV không được gửi.'
           : 'Bộ đếm ẩn danh chỉ lưu trên trình duyệt này và không ghi nội dung CV.'), element('p', summary), button(metrics ? 'Tắt và xóa số liệu' : 'Bật đo lường', () => {
-          if (metrics) localStorage.removeItem(analyticsKey);
-          else localStorage.setItem(analyticsKey, '{}');
+          localStorage.setItem(analyticsKey, metrics ? 'false' : '{}');
+          startAnalytics();
           open();
         }));
       } catch {

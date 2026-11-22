@@ -30,6 +30,7 @@ Cỡ chữ (pt)|Font size (pt)
 Giãn dòng|Line spacing
 Lề (mm)|Margin (mm)
 Đơn giản|Classic
+NodeFlair (gốc)|NodeFlair (original)
 Hiện đại|Modern
 Hai cột|Two columns
 Tối ưu ATS|ATS-friendly
@@ -102,7 +103,7 @@ Liên kết không hợp lệ.|Invalid link.
 CV quá dài để tạo liên kết. Hãy chia sẻ tệp PDF.|This resume is too long for a link. Share the PDF instead.
 Ai có liên kết đều đọc được nội dung CV. Hãy kiểm tra thông tin cá nhân trước khi gửi.|Anyone with the link can read the resume. Review your personal information before sharing.
 Bộ đếm ẩn danh chỉ lưu trên trình duyệt này và không ghi nội dung CV.|Anonymous counts stay in this browser and contain no resume content.
-Khi bật, các sự kiện tạo CV, đổi mẫu và yêu cầu in được gửi ẩn danh. Nội dung CV không được gửi.|When enabled, anonymous events record resume creation, template changes, and print requests. Resume content is never sent.
+Khi bật, Vercel Analytics nhận lượt truy cập, tạo CV, đổi mẫu và yêu cầu in. Nội dung CV không được gửi.|When enabled, Vercel Analytics receives page views, resume creation, template changes, and print requests. Resume content is never sent.
 Đo lường đang tắt.|Analytics is off.
 Tắt và xóa số liệu|Turn off and clear counts
 Bật đo lường|Enable analytics
