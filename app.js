@@ -373,15 +373,24 @@ function showDialog(title, ...content) {
 
 function exportPDF(version) {
   $('dialog').close();
-  const originalTitle = document.title;
   const filename = [version.cv.name, version.cv.role, version.label].filter(Boolean).join('-');
-  document.title = filename.replace(/[<>:"/\\|?*\u0000-\u001f]/gu, '-').replace(/\s+/gu, '_');
+  const frame = node('iframe', undefined, 'print-frame');
+  frame.title = 'Bản in CV';
+  frame.tabIndex = -1;
   renderPreview(version.cv, false, false);
-  window.addEventListener('afterprint', () => {
-    document.title = originalTitle;
-    renderPreview(active()?.draft);
+  const paper = $('paper').cloneNode(true);
+  renderPreview(active()?.draft);
+
+  frame.addEventListener('load', () => {
+    frame.contentDocument.title = filename.replace(/[<>:"/\\|?*\u0000-\u001f]/gu, '-').replace(/\s+/gu, '_');
+    frame.contentDocument.querySelector('main').append(paper);
+    frame.contentWindow.addEventListener('afterprint', () => frame.remove(), { once: true });
+    frame.contentWindow.print();
   }, { once: true });
-  window.print();
+  frame.srcdoc = '<!doctype html><html lang="vi"><head><meta charset="utf-8">' +
+    '<link rel="stylesheet" href="style.css"><title></title></head><body>' +
+    '<main></main></body></html>';
+  document.body.append(frame);
 }
 
 function versionForm(title, onSave, target = active(), cv = target.draft) {

@@ -60,6 +60,7 @@ dialog .entry{margin:0}
 .error{color:#a02c33}
 @media(max-width:800px){main{grid-template-columns:1fr}.editor{border-right:0}}
 @media(max-width:440px){.bar{align-items:flex-start}.bar .actions{justify-content:flex-end}.bar button{font-size:12px;padding:5px 7px}.brand{font-size:13px}}
+.print-frame{position:fixed;right:0;bottom:0;width:0;height:0;border:0}
 @page{size:A4;margin:7mm 9mm}
 @media print{
   body,main,.preview{display:block;background:white;padding:0;margin:0}
