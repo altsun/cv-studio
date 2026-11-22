@@ -294,8 +294,18 @@ function renderPreview(cv, original = Boolean(cv?.sourcePDF) && !editablePreview
     if (section.hidden || !entries.length) continue;
     const block = node('section', undefined, 'cv-section');
     block.append(node('h2', section.title));
+    let item;
+    let list;
+    let listIndent;
+    let previousBodyOnly = false;
     for (const entry of entries) {
-      const item = node('div', undefined, cv.pdfLayout ? 'cv-entry pdf-entry' : 'cv-entry');
+      const bodyOnly = cv.pdfLayout && !entry.title && !entry.date && !entry.organization && !entry.location;
+      if (!bodyOnly || !previousBodyOnly) {
+        item = node('div', undefined, cv.pdfLayout ? 'cv-entry pdf-entry' : 'cv-entry');
+        block.append(item);
+        list = null;
+      }
+      previousBodyOnly = bodyOnly;
       for (const [left, right] of [[entry.title, entry.date], [entry.organization, entry.location]]) {
         if (!left && !right) continue;
         const row = node('div', undefined, 'cv-line');
@@ -304,8 +314,6 @@ function renderPreview(cv, original = Boolean(cv?.sourcePDF) && !editablePreview
         row.append(label, node('span', right));
         item.append(row);
       }
-      let list;
-      let listIndent;
       for (const line of entry.body.split('\n')) {
         const indent = cv.pdfLayout ? /^ */u.exec(line)[0].length : 0;
         const bullet = /^\s*[-•]\s+/u.test(line);
@@ -333,7 +341,6 @@ function renderPreview(cv, original = Boolean(cv?.sourcePDF) && !editablePreview
         }
         (bullet ? list : item).append(paragraph);
       }
-      block.append(item);
     }
     content.append(block);
   }

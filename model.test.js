@@ -56,7 +56,7 @@ test('formatted import keeps rich text inside editable CV sections', () => {
   assert.equal(cv.sections[0].entries[0].body, '**Project**\n- Built [**the API**](https://example.com/api).');
 });
 
-test('PDF import retains indented subheadings and right-hand columns on the same row', async t => {
+test('PDF import creates editable rows and preserves indentation and right-hand columns', async t => {
   const item = (str, x, y, width) => ({
     str, transform: [10, 0, 0, 10, x, y], width, height: 10, fontName: 'font', hasEOL: true,
   });
@@ -92,11 +92,11 @@ test('PDF import retains indented subheadings and right-hand columns on the same
   const cv = fromText(await extractPDFPage(pdf), true);
   assert.equal(cv.pdfLayout, true);
   assert.deepEqual(cv.sections.map(section => section.title), ['Work Experience', 'Certifications']);
-  assert.equal(cv.sections[0].entries[0].body, [
+  assert.deepEqual(cv.sections[0].entries.map(entry => entry.body), [
     '  Software Engineer\tOct 2022 - Present',
     '  Company\tHanoi, Vietnam',
     '     Awards',
     '          - Recognition continued',
-  ].join('\n'));
+  ]);
   assert.equal(cv.sections[1].entries[0].body, '  Banking Fundamentals\tMay 2024');
 });

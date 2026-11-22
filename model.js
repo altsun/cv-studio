@@ -70,11 +70,13 @@ export function fromText(text, pdfLayout = false) {
     const line = raw.trim();
     const heading = line.replace(/^\*\*(.+)\*\*$/u, '$1');
     if (headings.test(heading) && (!pdfLayout || raw === raw.trimStart())) {
-      section = { title: heading, hidden: false, entries: [emptyEntry()] };
+      section = { title: heading, hidden: false, entries: pdfLayout ? [] : [emptyEntry()] };
       cv.sections.push(section);
+    } else if (section && pdfLayout) {
+      section.entries.push({ ...emptyEntry(), body: raw });
     } else if (section) {
       const entry = section.entries[0];
-      entry.body += (entry.body ? '\n' : '') + (pdfLayout ? raw : line.replace(/^[•●]\s*/u, '- '));
+      entry.body += (entry.body ? '\n' : '') + line.replace(/^[•●]\s*/u, '- ');
     } else if (!summary.length && /[@]|(?:https?:\/\/|linkedin\.com|github\.com)|\b\d{8,}\b/u.test(line)) {
       cv.contacts += (cv.contacts ? '\n' : '') + line;
     } else {
