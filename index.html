@@ -3,7 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>CV Studio</title>
+<title>CV Studio | Tạo CV và xuất PDF A4</title>
+<meta name="description" content="Tạo CV tiếng Việt hoặc tiếng Anh, chọn mẫu theo ngành, chỉnh sửa trực tiếp và xuất PDF A4 với CV Studio.">
+<link rel="canonical" href="https://cv-studio-phi.vercel.app/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="CV Studio | Tạo CV và xuất PDF A4">
+<meta property="og:description" content="Chỉnh sửa, đổi mẫu và xuất CV PDF A4.">
+<meta property="og:image" content="https://cv-studio-phi.vercel.app/og.png">
+<meta property="og:url" content="https://cv-studio-phi.vercel.app/">
+<link rel="icon" href="og.png" type="image/png">
 <link rel="stylesheet" href="style.css">
 <script type="module" src="app.js"></script>
 </head>
@@ -11,31 +19,54 @@
 <header class="bar">
   <a class="brand" href="./"><span aria-hidden="true">CV</span> CV Studio</a>
   <div class="actions">
-    <button id="history">Lịch sử</button>
-    <button id="save">Lưu phiên bản</button>
-    <button id="export" class="primary">Xuất PDF</button>
+    <a href="./mau-cv/" data-i18n="Mẫu theo ngành">Mẫu theo ngành</a>
+    <select id="language" aria-label="Ngôn ngữ" data-i18n-aria="Ngôn ngữ"><option value="vi">Tiếng Việt</option><option value="en">English</option></select>
+    <button id="history" data-i18n="Lịch sử">Lịch sử</button>
+    <button id="save" data-i18n="Lưu phiên bản">Lưu phiên bản</button>
+    <button id="export" class="primary" data-i18n="Xuất PDF">Xuất PDF</button>
   </div>
 </header>
-<main>
-  <section class="editor" aria-label="Trình chỉnh sửa">
-    <div class="intro"><h1>Chỉnh sửa CV</h1><p id="status" role="status"></p></div>
+<nav class="mobile-tabs actions" aria-label="CV Studio">
+  <button id="tab-editor" aria-controls="editor-panel" aria-pressed="true" data-i18n="Chỉnh sửa">Chỉnh sửa</button>
+  <button id="tab-preview" aria-controls="preview-panel" aria-pressed="false" data-i18n="Xem trước">Xem trước</button>
+</nav>
+<main id="workspace" data-panel="editor">
+  <section class="editor" id="editor-panel" aria-label="Trình chỉnh sửa" data-i18n-aria="Trình chỉnh sửa">
+    <div class="intro">
+      <h1 data-i18n="Chỉnh sửa CV">Chỉnh sửa CV</h1>
+      <p data-i18n="Dữ liệu lưu trong trình duyệt này. Hãy sao lưu JSON trước khi xóa dữ liệu trang hoặc đổi thiết bị.">Dữ liệu lưu trong trình duyệt này. Hãy sao lưu JSON trước khi xóa dữ liệu trang hoặc đổi thiết bị.</p>
+      <p id="status" role="status"></p>
+    </div>
     <div class="library">
-      <label>CV đang mở<select id="documents"></select></label>
+      <label><span data-i18n="CV đang mở">CV đang mở</span><select id="documents"></select></label>
       <div class="actions">
-        <button id="new">Tạo CV</button><button id="duplicate">Nhân bản</button>
-        <button id="import">Nhập tệp</button><button id="backup">Sao lưu</button>
-        <button id="delete" class="danger">Xóa CV</button>
+        <button id="new" data-i18n="Tạo CV">Tạo CV</button>
+        <button id="duplicate" data-i18n="Nhân bản">Nhân bản</button>
+        <button id="import" data-i18n="Nhập tệp">Nhập tệp</button>
+        <button id="backup" data-i18n="Sao lưu">Sao lưu</button>
+        <button id="delete" class="danger" data-i18n="Xóa CV">Xóa CV</button>
+      </div>
+      <div class="actions">
+        <button id="undo" data-i18n="Hoàn tác">Hoàn tác</button>
+        <button id="redo" data-i18n="Làm lại">Làm lại</button>
+        <button id="job" data-i18n="Ứng tuyển">Ứng tuyển</button>
+        <button id="share" data-i18n="Chia sẻ CV">Chia sẻ CV</button>
       </div>
       <input hidden id="file" type="file" accept=".json,.pdf,.txt">
     </div>
     <div id="fields"></div>
-    <button id="add-section">+ Thêm mục</button>
+    <button id="add-section" data-i18n="+ Thêm mục">+ Thêm mục</button>
   </section>
-  <section class="preview" aria-label="Xem trước CV">
-    <div class="preview-bar"><h2>Xem trước</h2><div id="preview-controls" class="actions"></div></div>
+  <section class="preview" id="preview-panel" aria-label="Xem trước" data-i18n-aria="Xem trước">
+    <div class="preview-bar">
+      <h2 data-i18n="Xem trước">Xem trước</h2>
+      <small id="page-count"></small>
+      <div id="preview-controls" class="actions"></div>
+    </div>
     <article class="paper" id="paper"></article>
   </section>
 </main>
-<dialog id="dialog"><div id="dialog-body"></div></dialog>
+<footer><a href="./mau-cv/" data-i18n="Mẫu theo ngành">Mẫu theo ngành</a> <button id="metrics" data-i18n="Đo lường">Đo lường</button></footer>
+<dialog id="dialog" aria-labelledby="dialog-title"><div id="dialog-body"></div></dialog>
 </body>
 </html>

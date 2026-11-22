@@ -1,3 +1,5 @@
+import { translate, setLanguage, language } from './translations.js';
+import { addAppearance, applyAppearance, compareCV, installExtras, track } from './studio.js';
 import { extractPDFPage } from './pdf-import.js';
 import { createDocument, emptyEntry, fromText, isBackup, matchesLatestVersion, saveVersion, suggestVersion } from './model.js';
 
@@ -22,11 +24,68 @@ try {
   // Start with the sample if local storage is unavailable or contains invalid data.
 }
 
+const undo = [];
+const redo = [];
+let lastSnapshot = JSON.stringify(state);
+
+function checkpoint() {
+  const snapshot = JSON.stringify(state);
+  if (snapshot === lastSnapshot) return;
+  undo.push(lastSnapshot);
+  if (undo.length > 30) undo.shift();
+  redo.length = 0;
+  lastSnapshot = snapshot;
+  updateHistoryButtons();
+}
+
+function updateHistoryButtons() {
+  $('undo').disabled = !undo.length;
+  $('redo').disabled = !redo.length;
+}
+
+function travel(from, to) {
+  if (!from.length) return;
+  to.push(lastSnapshot);
+  lastSnapshot = from.pop();
+  state = JSON.parse(lastSnapshot);
+  updateHistoryButtons();
+  persist();
+  render();
+}
+
+function moveItem(items, from, to, renderMoved) {
+  if (from < 0 || to < 0 || from === to || to >= items.length) return;
+  items.splice(to, 0, items.splice(from, 1)[0]);
+  renderMoved(to);
+}
+
+let dragging;
+function reorder(handle, target, items, index, renderMoved) {
+  handle.draggable = true;
+  handle.addEventListener('dragstart', event => {
+    event.stopPropagation();
+    dragging = { items, index };
+    event.dataTransfer.setData('text/plain', String(index));
+    event.dataTransfer.effectAllowed = 'move';
+  });
+  handle.addEventListener('dragend', () => { dragging = undefined; });
+  target.addEventListener('dragover', event => {
+    if (dragging?.items === items) event.preventDefault();
+  });
+  target.addEventListener('drop', event => {
+    if (dragging?.items !== items) return;
+    event.preventDefault();
+    event.stopPropagation();
+    moveItem(items, dragging.index, index, renderMoved);
+    dragging = undefined;
+  });
+}
+
 const editablePreviews = new WeakSet();
 const active = () => state.documents.find(doc => doc.id === state.active);
 const node = (tag, text, className) => {
   const element = document.createElement(tag);
-  if (text !== undefined) element.textContent = text;
+  if (text !== undefined) element.textContent = translate(text);
   if (className) element.className = className;
   return element;
 };
@@ -40,7 +99,7 @@ const button = (text, click, primary = false) => {
 function persist(nextState = state) {
   try {
     localStorage.setItem(storageKey, JSON.stringify(nextState));
-    status('Đã tự lưu trên trình duyệt');
+    status(translate('Đã lưu lúc') + ' ' + new Date().toLocaleTimeString(document.documentElement.lang));
     return true;
   } catch {
     status('Không thể tự lưu. Hãy tải tệp sao lưu trước khi đóng trang.', true);
@@ -49,23 +108,31 @@ function persist(nextState = state) {
 }
 
 function status(message, error = false) {
-  $('status').textContent = message;
+  $('status').textContent = translate(message);
   $('status').classList.toggle('error', error);
 }
 
 function field(label, value, update, multiline = false) {
   const wrapper = node('label', label);
+  const count = multiline ? node('small', '', 'muted counter') : null;
   const input = node(multiline ? 'textarea' : 'input');
   input.value = value;
   input.addEventListener('input', () => {
     update(input.value);
-    persist();
+    updateCount();
     if (!wrapper.closest('dialog')) {
+      checkpoint();
+      persist();
       editablePreviews.add(active().draft);
       renderPreview(active().draft);
     }
   });
+  const updateCount = () => {
+    if (count) count.textContent = input.value.length + (language() === 'vi' ? ' ký tự · ' : ' characters · ') + (input.value ? input.value.split('\n').length : 0) + (language() === 'vi' ? ' dòng' : ' lines');
+  };
   wrapper.append(input);
+  if (count) wrapper.append(count);
+  updateCount();
   return wrapper;
 }
 
@@ -76,14 +143,14 @@ function bind(label, object, property, multiline = false) {
 function renderEditor(openSections = []) {
   const doc = active();
   const documents = $('documents');
-  documents.replaceChildren(...state.documents.map(item => new Option(item.label || 'CV chưa đặt tên', item.id)));
-  for (const id of ['documents', 'duplicate', 'delete', 'backup', 'history', 'save', 'export', 'add-section']) {
+  documents.replaceChildren(...state.documents.map(item => new Option(item.label || translate('CV chưa đặt tên'), item.id)));
+  for (const id of ['documents', 'duplicate', 'delete', 'backup', 'history', 'save', 'export', 'add-section', 'job', 'share']) {
     $(id).disabled = !doc;
   }
   const fields = $('fields');
   if (!doc) {
-    documents.add(new Option('Chưa có CV', ''));
-    fields.replaceChildren();
+    documents.add(new Option(translate('Chưa có CV'), ''));
+    fields.replaceChildren(node('p', 'Tạo CV mới hoặc nhập tệp để bắt đầu.', 'muted'));
     return;
   }
   documents.value = doc.id;
@@ -96,22 +163,20 @@ function renderEditor(openSections = []) {
   basic.firstChild.querySelector('input').addEventListener('input', () => {
     $('documents').selectedOptions[0].textContent = doc.label || 'CV chưa đặt tên';
   });
-  fields.replaceChildren(basic);
+  fields.replaceChildren(basic, addAppearance(cv, () => { checkpoint(); persist(); editablePreviews.add(cv); renderPreview(cv); }));
 
   cv.sections.forEach((section, index) => {
     const card = node('details', undefined, 'card');
     card.open = openSections.includes(index);
-    const heading = node('summary', section.title || 'Mục chưa đặt tên');
+    const heading = node('summary', section.title || undefined);
+    heading.textContent = section.title || translate('Mục chưa đặt tên');
     const title = field('Tên mục', section.title, value => {
       section.title = value;
-      heading.textContent = value || 'Mục chưa đặt tên';
+      heading.textContent = value || translate('Mục chưa đặt tên');
     });
     const controls = node('div', undefined, 'actions');
-    const move = offset => {
-      const target = index + offset;
-      [cv.sections[index], cv.sections[target]] = [cv.sections[target], cv.sections[index]];
-      refreshEdit([target]);
-    };
+    const move = offset => moveItem(cv.sections, index, index + offset, target => refreshEdit([target]));
+    reorder(heading, card, cv.sections, index, target => refreshEdit([target]));
     const up = button('Lên', () => move(-1));
     const down = button('Xuống', () => move(1));
     up.disabled = index === 0;
@@ -132,7 +197,25 @@ function renderEditor(openSections = []) {
       titleRow.append(bind('Tiêu đề', entry, 'title'), bind('Thời gian', entry, 'date'));
       const organization = node('div', undefined, 'row');
       organization.append(bind('Đơn vị', entry, 'organization'), bind('Địa điểm', entry, 'location'));
-      item.append(titleRow, organization, bind('Nội dung', entry, 'body', true),
+      const body = bind('Nội dung', entry, 'body', true);
+      const input = body.querySelector('textarea');
+      const toolbar = node('div', undefined, 'actions');
+      const mark = (before, after = '') => {
+        const { selectionStart, selectionEnd, value } = input;
+        const start = after ? selectionStart : (selectionStart ? value.lastIndexOf('\n', selectionStart - 1) + 1 : 0);
+        input.setRangeText(before + value.slice(start, selectionEnd) + after, start, selectionEnd, 'select');
+        input.dispatchEvent(new Event('input'));
+        input.focus();
+      };
+      const earlier = button('Dòng lên', () => moveItem(section.entries, entryIndex, entryIndex - 1, () => refreshEdit([index])));
+      const later = button('Dòng xuống', () => moveItem(section.entries, entryIndex, entryIndex + 1, () => refreshEdit([index])));
+      earlier.disabled = entryIndex === 0;
+      later.disabled = entryIndex === section.entries.length - 1;
+      const handle = node('span', '↕', 'drag-handle');
+      handle.setAttribute('aria-hidden', 'true');
+      reorder(handle, item, section.entries, entryIndex, () => refreshEdit([index]));
+      toolbar.append(handle, earlier, later, button('In đậm', () => mark('**', '**')), button('Gạch đầu dòng', () => mark('- ')));
+      item.append(titleRow, organization, toolbar, body,
         button('Xóa dòng', () => {
           if (confirm('Xóa dòng này khỏi bản nháp?')) {
             section.entries.splice(entryIndex, 1);
@@ -232,6 +315,17 @@ function paginatePreview(paper, content) {
       place([[[], block]]);
       continue;
     }
+    const probe = node('div', undefined, 'preview-page');
+    const probeBody = node('div', undefined, 'preview-page-content');
+    probeBody.append(block.cloneNode(true));
+    probe.append(probeBody);
+    paper.append(probe);
+    const fits = probe.offsetHeight <= probe.clientWidth * 297 / 210 + 1;
+    probe.remove();
+    if (fits) {
+      place([[[], block]]);
+      continue;
+    }
     let pending = [[[block], block.firstElementChild]];
     for (const entry of Array.from(block.children).slice(1)) {
       for (const child of entry.children) {
@@ -250,6 +344,12 @@ function paginatePreview(paper, content) {
   }
 }
 
+function setPageCount(pages) {
+  $('page-count').textContent = pages + (language() === 'vi'
+    ? ' trang A4' + (pages > 2 ? ' · CV dài hơn 2 trang' : '')
+    : ' A4 ' + (pages === 1 ? 'page' : 'pages') + (pages > 2 ? ' · Resume exceeds 2 pages' : ''));
+}
+
 function renderPreview(cv, original = Boolean(cv?.sourcePDF) && !editablePreviews.has(cv), paginate = true) {
   reflowPreview = undefined;
   const paper = $('paper');
@@ -258,6 +358,8 @@ function renderPreview(cv, original = Boolean(cv?.sourcePDF) && !editablePreview
   const controls = $('preview-controls');
   controls.replaceChildren();
   paper.classList.toggle('pdf-paper', original);
+  applyAppearance(paper, cv);
+  $('page-count').textContent = '';
   if (!cv) {
     paper.replaceChildren(node('p', 'Tạo hoặc nhập CV để xem trước.', 'muted'));
     return;
@@ -284,16 +386,16 @@ function renderPreview(cv, original = Boolean(cv?.sourcePDF) && !editablePreview
   const head = node('div', undefined, 'cv-head');
   const contact = node('div', undefined, 'contacts');
   inline(contact, cv.contacts);
-  head.append(node('h1', [cv.name, cv.role].filter(Boolean).join(' - ') || 'Họ tên'), contact);
+  head.append(Object.assign(node('h1'), { textContent: [cv.name, cv.role].filter(Boolean).join(' - ') || translate('Họ tên') }), contact);
   const summary = node('p', undefined, 'summary');
   inline(summary, cv.summary);
   const content = node('div');
   content.append(head, summary);
   for (const section of cv.sections) {
-    const entries = section.entries.filter(entry => Object.values(entry).some(value => value.trim()));
+    const entries = section.entries.filter(entry => Object.values(entry).some(value => typeof value === 'string' && value.trim()));
     if (section.hidden || !entries.length) continue;
     const block = node('section', undefined, 'cv-section');
-    block.append(node('h2', section.title));
+    block.append(Object.assign(node('h2'), { textContent: section.title }));
     for (const entry of entries) {
       const item = node('div', undefined, cv.pdfLayout ? 'cv-entry pdf-entry' : 'cv-entry');
       block.append(item);
@@ -341,7 +443,12 @@ function renderPreview(cv, original = Boolean(cv?.sourcePDF) && !editablePreview
     content.append(block);
   }
   if (paginate) {
-    reflowPreview = () => paginatePreview(paper, content);
+    reflowPreview = () => {
+      if (!paper.clientWidth) return;
+      paginatePreview(paper, content);
+      const pages = paper.childElementCount;
+      setPageCount(pages);
+    };
     reflowPreview();
   } else {
     paper.replaceChildren(...content.children);
@@ -354,6 +461,7 @@ function refreshEdit(openSections) {
 }
 
 function refresh(openSections) {
+  checkpoint();
   persist();
   render(openSections);
 }
@@ -370,24 +478,31 @@ function addDocument(doc) {
 }
 
 function showDialog(title, ...content) {
-  $('dialog-body').replaceChildren(node('h2', title), ...content, button('Đóng', () => $('dialog').close()));
+  const heading = node('h2', title);
+  heading.id = 'dialog-title';
+  $('dialog-body').replaceChildren(heading, ...content, button('Đóng', () => $('dialog').close()));
   if (!$('dialog').open) $('dialog').showModal();
 }
 
 function exportPDF(cv) {
   $('dialog').close();
+  track('export');
   const filename = (active().label.trim() || 'CV').replace(/[<>:"/\\|?*\u0000-\u001f]/gu, '-').replace(/[. ]+$/u, '') || 'CV';
   const frame = node('iframe', undefined, 'print-frame');
   frame.title = 'Bản in CV';
   frame.tabIndex = -1;
   renderPreview(cv, false, false);
   const paper = $('paper').cloneNode(true);
+  const content = node('div');
+  content.append(...paper.children);
+  paper.classList.add('paginated-paper');
   renderPreview(active()?.draft);
 
   frame.addEventListener('load', () => {
     const originalTitle = document.title;
     frame.contentDocument.title = filename;
     frame.contentDocument.querySelector('main').append(paper);
+    paginatePreview(paper, content);
     frame.contentWindow.addEventListener('afterprint', () => {
       document.title = originalTitle;
       frame.remove();
@@ -398,7 +513,7 @@ function exportPDF(cv) {
   }, { once: true });
   frame.srcdoc = '<!doctype html><html lang="vi"><head><meta charset="utf-8">' +
     '<link rel="stylesheet" href="style.css"><title></title></head><body>' +
-    '<main></main></body></html>';
+    '<main class="print-layout"></main></body></html>';
   document.body.append(frame);
 }
 
@@ -408,7 +523,7 @@ function versionForm(title, onSave, target = active(), cv = target.draft) {
   const number = node('input');
   number.required = true;
   number.maxLength = 60;
-  number.placeholder = 'Ví dụ v4.7.0';
+  number.placeholder = translate('Ví dụ v4.7.0');
   number.value = suggestVersion(target.versions);
   label.append(number);
   const noteLabel = node('label', 'Ghi chú');
@@ -442,18 +557,19 @@ function showVersions(print = false) {
   const doc = active();
   const versions = doc.versions.map(version => {
     const item = node('div', undefined, 'entry');
-    const date = new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium' }).format(new Date(version.date));
+    const date = new Intl.DateTimeFormat(language(), { dateStyle: 'medium' }).format(new Date(version.date));
     item.append(node('strong', version.label), node('p', [date, version.note].filter(Boolean).join(' · '), 'muted'));
     const actions = node('div', undefined, 'actions');
     if (!print) actions.append(button('Xem', () => {
       $('dialog').close();
+      tab-preview.click();
       renderPreview(version.cv);
       status('Đang xem ' + version.label);
       $('status').append(' ', button('Về bản nháp', () => {
         renderPreview(doc.draft);
         persist();
       }));
-    }), button('Khôi phục', () => {
+    }), button('So sánh', () => showDialog('So sánh với bản nháp', compareCV(version.cv, doc.draft), button('Về lịch sử', () => showVersions()))), button('Khôi phục', () => {
       const restore = () => {
         doc.draft = structuredClone(version.cv);
         $('dialog').close();
@@ -471,7 +587,8 @@ function showVersions(print = false) {
   });
   showDialog(print ? 'Xuất PDF' : 'Lịch sử phiên bản',
     ...(print ? [node('p', 'Chọn “Lưu dưới dạng PDF” trong hộp thoại in và tắt đầu trang, chân trang nếu đang bật.', 'muted'),
-      versionForm('Lưu phiên bản và xuất PDF', version => { persist(); exportPDF(version.cv); })] : []),
+      button('Tải PDF bản nháp', () => exportPDF(doc.draft), true),
+      versionForm('Lưu phiên bản và xuất PDF', version => { checkpoint(); persist(); exportPDF(version.cv); })] : []),
     ...(versions.length ? versions : [node('p', 'Chưa có phiên bản đã lưu.', 'muted')]));
 }
 
@@ -485,6 +602,7 @@ async function renderPDF(source, container) {
   const task = await loadPDF(await (await fetch(source)).arrayBuffer());
   try {
     const pdf = await task.promise;
+    if (container.isConnected) setPageCount(pdf.numPages);
     for (let number = 1; number <= pdf.numPages && container.isConnected; number++) {
       const page = await pdf.getPage(number);
       const viewport = page.getViewport({ scale: 2 });
@@ -553,7 +671,7 @@ function reviewImport(file, text, sourcePDF, isPDF = false) {
 }
 
 $('documents').addEventListener('change', event => { state.active = event.target.value; refresh(); });
-$('new').onclick = () => addDocument(createDocument('CV mới'));
+$('new').onclick = () => { track('create'); addDocument(createDocument('CV mới')); };
 $('duplicate').onclick = () => addDocument(createDocument((active().label || 'CV') + ' (bản sao)', active().draft, active().versions));
 $('delete').onclick = () => {
   const doc = active();
@@ -563,6 +681,7 @@ $('delete').onclick = () => {
   const nextState = { documents, active: (documents[index] ?? documents[index - 1])?.id ?? null };
   if (!persist(nextState)) return;
   state = nextState;
+  checkpoint();
   render();
   status('Đã xóa CV');
   (active() ? $('documents') : $('new')).focus();
@@ -573,15 +692,22 @@ $('export').onclick = () => {
   if (matchesLatestVersion(doc)) exportPDF(doc.draft);
   else showVersions(true);
 };
-$('save').onclick = () => showDialog('Lưu phiên bản', versionForm('Lưu phiên bản', () => persist()));
+$('save').onclick = () => showDialog('Lưu phiên bản', versionForm('Lưu phiên bản', () => { checkpoint(); persist(); }));
 $('add-section').onclick = () => {
-  const sections = active().draft.sections;
-  sections.push({ title: 'Mục mới', hidden: false, entries: [emptyEntry()] });
-  refreshEdit([sections.length - 1]);
-  $('fields').lastElementChild.scrollIntoView({ block: 'nearest' });
+  const choices = node('div', undefined, 'actions');
+  for (const title of ['Kinh nghiệm', 'Học vấn', 'Kỹ năng', 'Dự án', 'Chứng chỉ', 'Ngoại ngữ', 'Mục tùy chỉnh']) {
+    choices.append(button(title, () => {
+      const sections = active().draft.sections;
+      sections.push({ title, hidden: false, entries: [emptyEntry()] });
+      $('dialog').close();
+      refreshEdit([sections.length - 1]);
+      $('fields').lastElementChild.querySelector('input').focus();
+    }));
+  }
+  showDialog('Chọn loại mục', choices);
 };
 $('backup').onclick = () => {
-  const blob = new Blob([JSON.stringify({ format: storageKey, documents: state.documents }, null, 2)], { type: 'application/json' });
+  const blob = new Blob([JSON.stringify({ format: storageKey, version: 1, documents: state.documents }, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const link = node('a');
   link.href = url;
@@ -598,6 +724,7 @@ $('file').onchange = async event => {
     if (file.size > 24 * 1024 * 1024) throw new Error('Chọn tệp nhỏ hơn 24 MB.');
     if (/\.json$/iu.test(file.name)) {
       const backup = JSON.parse((await file.text()).replace(/^\uFEFF/u, ''));
+      if (backup?.version !== undefined && backup.version !== 1) throw new Error('Phiên bản tệp sao lưu chưa được hỗ trợ.');
       if (!isBackup(backup)) throw new Error('Tệp sao lưu CV Studio không hợp lệ.');
       const documents = backup.documents.map(doc => createDocument(doc.label, doc.draft, doc.versions));
       state.documents.push(...documents);
@@ -620,4 +747,9 @@ $('file').onchange = async event => {
   }
 };
 
+$('undo').onclick = () => travel(undo, redo);
+$('redo').onclick = () => travel(redo, undo);
+updateHistoryButtons();
+setLanguage(language());
+installExtras({ active, addDocument, showDialog, render });
 refresh();

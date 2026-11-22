@@ -69,3 +69,61 @@ dialog .entry{margin:0}
   .preview-page:last-child{break-after:auto}
   .paper{aspect-ratio:auto;max-width:none;padding:0;box-shadow:none;font-size:8.4pt}
 }
+
+/* The same proportional A4 layout is measured on screen and printed at 210 mm. */
+.paper{container-type:inline-size}
+.preview-page{padding:calc(var(--cv-margin,13) * 100cqw / 210);min-height:calc(100cqw * 297 / 210);aspect-ratio:auto}
+.preview-page-content{font-size:calc(var(--cv-size,11) * 100cqw / 595.276);line-height:var(--cv-spacing,1.43)}
+.cv-head,.paper .summary{margin-bottom:.7em}
+.cv-section{margin-top:.7em}
+.cv-section h2{margin-bottom:.3em;padding-bottom:.25em}
+.cv-entry{padding-left:.5em;margin-bottom:.35em}
+.cv-line{gap:.8em}
+.paper ul{margin:.2em 0;padding-left:1.5em}
+.paper p,.paper li{margin:.15em 0}
+.paper .item-text{padding-left:.8em}
+.paper[data-template=classic] .cv-section h2{color:var(--accent)}
+.paper[data-template=modern] .cv-head{text-align:left;border-left:.28em solid var(--accent);padding-left:.7em}
+.paper[data-template=modern] .cv-section h2{color:var(--accent);border-color:var(--accent);letter-spacing:.12em}
+.paper[data-template=columns] .preview-page-content{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:1.5em;align-items:start}
+.paper[data-template=columns] .cv-head,.paper[data-template=columns] .summary{grid-column:1/-1}
+.paper[data-template=columns] .cv-section h2{color:var(--accent)}
+.paper[data-template=ats] .cv-head{text-align:left}
+.paper[data-template=ats] .cv-section h2{text-transform:none;border:0;font-size:1.1em}
+.paper[data-template=ats] .cv-line{display:block}
+.paper[data-template=ats] .cv-line strong:not(:empty)+span:not(:empty)::before{content:" | "}
+.paper[data-template=ats] .cv-line span{font-weight:400}
+.appearance{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 10px}
+.appearance h2{grid-column:1/-1;font-size:15px;margin:0}
+.appearance input[type=color]{height:37px;padding:3px}
+.counter{margin:0;font-weight:400}
+.drag-handle,summary[draggable=true]{cursor:grab}
+.drag-handle{padding:4px 8px;color:#415777}
+.comparison{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.comparison pre{white-space:pre-wrap;overflow-wrap:anywhere;margin:0 0 8px;padding:5px;background:#f1f5fa;font:inherit}
+.comparison .changed{background:#fff0c8}
+#language{width:auto}
+footer{max-width:1480px;margin:auto;padding:16px clamp(16px,4vw,60px);display:flex;gap:14px;align-items:center}
+.bar a,footer a,.landing a{color:var(--blue)}
+:focus-visible{outline:3px solid #2866bb;outline-offset:2px}
+.mobile-tabs{display:none}
+.mobile-tabs [aria-pressed=true]{background:var(--blue);color:white}
+.preview-bar small{color:#415777;text-align:center}
+.landing{display:block;max-width:860px;padding:42px clamp(16px,5vw,60px)}
+.landing h1{line-height:1.15;font-size:clamp(30px,6vw,52px)}
+.landing li{margin-bottom:8px}
+.landing .card{margin-top:20px}
+@media(max-width:800px){
+  .mobile-tabs{display:flex;padding:10px 16px;background:#fff;border-bottom:1px solid var(--line)}
+  #workspace[data-panel=editor] #preview-panel,#workspace[data-panel=preview] #editor-panel{display:none}
+}
+.print-frame{width:210mm;height:297mm;left:-300mm;right:auto}
+.print-layout{display:block;width:210mm;max-width:none;margin:0}
+.print-layout .paper{width:210mm;max-width:none}
+@page{size:A4;margin:0}
+@media print{
+  .print-layout{width:210mm}
+  .print-layout .preview-page{padding:calc(var(--cv-margin,13) * 100cqw / 210);min-height:296.85mm;break-inside:auto}
+}
+#status{min-height:1.5em}
+#workspace{min-height:100vh}

@@ -45,13 +45,13 @@ const hasStrings = (object, keys) => object && keys.every(key => typeof object[k
 
 export function isCV(cv) {
   return hasStrings(cv, ['name', 'role', 'contacts', 'summary']) && (cv.sourcePDF === undefined || (typeof cv.sourcePDF === 'string'
-      && cv.sourcePDF.startsWith('data:application/pdf;base64,'))) && Array.isArray(cv.sections)
+      && cv.sourcePDF.startsWith('data:application/pdf;base64,'))) && Array.isArray(cv.sections) && (cv.appearance === undefined || (cv.appearance && typeof cv.appearance === 'object' && !Array.isArray(cv.appearance)))
     && cv.sections.every(section => hasStrings(section, ['title']) && typeof section.hidden === 'boolean'
       && Array.isArray(section.entries) && section.entries.every(entry => hasStrings(entry, Object.keys(emptyEntry()))));
 }
 
 export function isBackup(backup) {
-  return backup?.format === 'cv-studio-v1' && Array.isArray(backup.documents) && backup.documents.length > 0
+  return backup?.format === 'cv-studio-v1' && (backup.version === undefined || backup.version === 1) && Array.isArray(backup.documents) && backup.documents.length > 0
     && backup.documents.every(doc => hasStrings(doc, ['label']) && isCV(doc.draft) && Array.isArray(doc.versions)
       && doc.versions.every(v => hasStrings(v, ['label', 'note', 'date']) && Number.isFinite(Date.parse(v.date)) && isCV(v.cv))
       && new Set(doc.versions.map(v => v.label.trim().toLowerCase())).size === doc.versions.length);
