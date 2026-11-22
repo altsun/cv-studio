@@ -7,12 +7,17 @@ body{margin:0}
 .actions,.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 button,input,textarea,select{font:inherit;color:inherit}
 button{padding:7px 12px;border:1px solid var(--line);border-radius:7px;background:#fff;cursor:pointer;font-weight:600}
-button:hover{background:#eff5ff;border-color:#849fc9}
-button.danger{color:#a02c33}
-button.danger:hover:not(:disabled){background:#fff0f1;border-color:#a02c33}
+button:hover:not(:disabled){background:#eff5ff;border-color:#849fc9}
+button:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+button.secondary{background:#edf4ff;border-color:#849fc9;color:#173969}
+button.secondary:hover:not(:disabled){background:#dceaff}
+button.quiet{background:transparent;border-color:transparent;color:#3f5873}
+button.quiet:hover:not(:disabled){background:#eff5ff;border-color:transparent;text-decoration:underline}
+button.danger{background:#fff0f1;border-color:#c88086;color:#a02c33}
+button.danger:hover:not(:disabled){background:#ffe0e3;border-color:#a02c33}
 button:disabled{opacity:.45;cursor:default}
 button.primary{background:var(--blue);border-color:var(--blue);color:white}
-button.primary:hover{background:#173969}
+button.primary:hover:not(:disabled){background:#173969}
 main{display:grid;grid-template-columns:minmax(315px,440px) minmax(0,1fr);max-width:1480px;margin:auto}
 .editor{padding:26px clamp(16px,3vw,34px) 38px;background:#f9fbfe;border-right:1px solid var(--line)}
 .intro h1{font-size:27px;letter-spacing:-.025em;margin:0}
