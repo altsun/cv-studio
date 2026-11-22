@@ -399,7 +399,7 @@ function exportPDF(cv) {
   document.body.append(frame);
 }
 
-function versionForm(title, onSave, target = active(), cv = target.draft, onDecline) {
+function versionForm(title, onSave, target = active(), cv = target.draft) {
   const form = node('form');
   const label = node('label', 'Số phiên bản');
   const number = node('input');
@@ -422,7 +422,6 @@ function versionForm(title, onSave, target = active(), cv = target.draft, onDecl
     event.preventDefault();
     if (unchanged && !window.confirm('Nội dung giống phiên bản lưu gần nhất. Bạn có muốn tạo phiên bản mới không?')) {
       $('dialog').close();
-      onDecline?.(cv);
       return;
     }
     try {
@@ -469,7 +468,7 @@ function showVersions(print = false) {
   });
   showDialog(print ? 'Xuất PDF' : 'Lịch sử phiên bản',
     ...(print ? [node('p', 'Chọn “Lưu dưới dạng PDF” trong hộp thoại in và tắt đầu trang, chân trang nếu đang bật.', 'muted'),
-      versionForm('Lưu phiên bản và xuất PDF', version => { persist(); exportPDF(version.cv); }, doc, doc.draft, exportPDF)] : []),
+      versionForm('Lưu phiên bản và xuất PDF', version => { persist(); exportPDF(version.cv); })] : []),
     ...(versions.length ? versions : [node('p', 'Chưa có phiên bản đã lưu.', 'muted')]));
 }
 
@@ -566,7 +565,11 @@ $('delete').onclick = () => {
   (active() ? $('documents') : $('new')).focus();
 };
 $('history').onclick = () => showVersions();
-$('export').onclick = () => showVersions(true);
+$('export').onclick = () => {
+  const doc = active();
+  if (matchesLatestVersion(doc)) exportPDF(doc.draft);
+  else showVersions(true);
+};
 $('save').onclick = () => showDialog('Lưu phiên bản', versionForm('Lưu phiên bản', () => persist()));
 $('add-section').onclick = () => {
   const sections = active().draft.sections;
