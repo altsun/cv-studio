@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CV Studio</title>
+<link rel="stylesheet" href="style.css">
+<script type="module" src="app.js"></script>
+</head>
+<body>
+<header class="bar">
+  <a class="brand" href="./"><span aria-hidden="true">CV</span> CV Studio</a>
+  <div class="actions">
+    <button id="history">Lịch sử</button>
+    <button id="save">Lưu phiên bản</button>
+    <button id="export" class="primary">Xuất PDF</button>
+  </div>
+</header>
+<main>
+  <section class="editor" aria-label="Trình chỉnh sửa">
+    <div class="intro"><h1>Chỉnh sửa CV</h1><p id="status" role="status"></p></div>
+    <div class="library">
+      <label>CV đang mở<select id="documents"></select></label>
+      <div class="actions">
+        <button id="new">Tạo CV</button><button id="duplicate">Nhân bản</button>
+        <button id="import">Nhập tệp</button><button id="backup">Sao lưu</button>
+      </div>
+      <input hidden id="file" type="file" accept=".json,.pdf,.txt">
+    </div>
+    <div id="fields"></div>
+    <button id="add-section">+ Thêm mục</button>
+  </section>
+  <section class="preview" aria-label="Xem trước CV">
+    <div class="preview-bar"><h2>Xem trước</h2><span>A4</span></div>
+    <article class="paper" id="paper"></article>
+  </section>
+</main>
+<dialog id="dialog"><div id="dialog-body"></div></dialog>
+</body>
+</html>
