@@ -56,7 +56,7 @@ test('formatted import keeps rich text inside editable CV sections', () => {
   assert.equal(cv.sections[0].entries[0].body, '**Project**\n- Built [**the API**](https://example.com/api).');
 });
 
-test('PDF import creates editable rows and preserves indentation and right-hand columns', async t => {
+test('PDF import groups each job with its organization, projects and bullets', async t => {
   const item = (str, x, y, width) => ({
     str, transform: [10, 0, 0, 10, x, y], width, height: 10, fontName: 'font', hasEOL: true,
   });
@@ -66,12 +66,18 @@ test('PDF import creates editable rows and preserves indentation and right-hand 
     item('Oct 2022 - Present', 470, 700, 100),
     item('Software Engineer', 35, 700, 100),
     item('Hanoi, Vietnam', 490, 688, 80),
-    item('Company', 35, 688, 50),
+    item('NAB Vietnam', 35, 688, 60),
+    item('Project: NAB Connect', 42.5, 682, 100),
     item('Awards', 42.5, 676, 40),
     item('•', 45, 664, 4),
     item('Recognition', 55, 664, 60),
     item('continued', 55, 652, 50),
-    item('Certifications', 30, 630, 75),
+    item('Engineer', 35, 642, 45),
+    item('Dec 2020 - Oct 2022', 470, 642, 100),
+    item('Boydens Engineering', 35, 630, 100),
+    item('Hanoi, Vietnam', 490, 630, 80),
+    item('- Designed Dynamo scripts', 55, 620, 120),
+    item('Certifications', 30, 616, 75),
     item('May 2024', 520, 610, 50),
     item('Banking Fundamentals', 35, 610, 110),
   ];
@@ -92,11 +98,18 @@ test('PDF import creates editable rows and preserves indentation and right-hand 
   const cv = fromText(await extractPDFPage(pdf), true);
   assert.equal(cv.pdfLayout, true);
   assert.deepEqual(cv.sections.map(section => section.title), ['Work Experience', 'Certifications']);
-  assert.deepEqual(cv.sections[0].entries.map(entry => entry.body), [
-    '  Software Engineer\tOct 2022 - Present',
-    '  Company\tHanoi, Vietnam',
-    '     Awards',
-    '          - Recognition continued',
+  assert.deepEqual(cv.sections[0].entries, [
+    {
+      title: 'Software Engineer', date: 'Oct 2022 - Present',
+      organization: 'NAB Vietnam', location: 'Hanoi, Vietnam',
+      body: '     Project: NAB Connect\n     Awards\n          - Recognition continued',
+    },
+    {
+      title: 'Engineer', date: 'Dec 2020 - Oct 2022',
+      organization: 'Boydens Engineering', location: 'Hanoi, Vietnam',
+      body: '          - Designed Dynamo scripts',
+    },
   ]);
-  assert.equal(cv.sections[1].entries[0].body, '  Banking Fundamentals\tMay 2024');
+  assert.equal(cv.sections[1].entries[0].title, 'Banking Fundamentals');
+  assert.equal(cv.sections[1].entries[0].date, 'May 2024');
 });

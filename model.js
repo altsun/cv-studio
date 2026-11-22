@@ -57,6 +57,9 @@ export function isBackup(backup) {
       && new Set(doc.versions.map(v => v.label.trim().toLowerCase())).size === doc.versions.length);
 }
 
+const pdfDate = /^(?:(?:\p{L}{3,12}\.?\s+|\d{1,2}[./-]))?\d{4}(?:\s*[-–—]\s*(?:(?:\p{L}{3,12}\.?\s+|\d{1,2}[./-])?\d{4}|present|current|now|hi\u1ec7n t\u1ea1i))?$/iu;
+const projectHeading = /^(projects|dự án)$/iu;
+
 export function fromText(text, pdfLayout = false) {
   const lines = text.split(/\r?\n/).filter(line => line.trim());
   const cv = emptyCV();
@@ -65,6 +68,9 @@ export function fromText(text, pdfLayout = false) {
   cv.sections = [];
   const headings = /^(work experience|experience|professional experience|projects|skills|technical skills|certifications|education|languages|awards|kinh nghiệm|dự án|kỹ năng|chứng chỉ|học vấn|ngoại ngữ|kinh nghiệm làm việc)$/iu;
   let section;
+  let entry;
+  let headerIndent;
+  let readOrganization = false;
   const summary = [];
   for (const raw of lines) {
     const line = raw.trim();
@@ -72,10 +78,35 @@ export function fromText(text, pdfLayout = false) {
     if (headings.test(heading) && (!pdfLayout || raw === raw.trimStart())) {
       section = { title: heading, hidden: false, entries: pdfLayout ? [] : [emptyEntry()] };
       cv.sections.push(section);
+      entry = section.entries[0];
+      headerIndent = undefined;
+      readOrganization = false;
     } else if (section && pdfLayout) {
-      section.entries.push({ ...emptyEntry(), body: raw });
+      const [left, right = ''] = line.split('\t', 2);
+      const indent = raw.length - raw.trimStart().length;
+      const date = right.trim().replace(/^\*\*(.+)\*\*$/u, '$1');
+      const datedHeader = pdfDate.test(date) && !/^[-•]\s/u.test(left);
+      const standaloneProject = !right && projectHeading.test(section.title) && /^project\s*:/iu.test(heading)
+        && (headerIndent === undefined || indent <= headerIndent);
+      if (datedHeader || standaloneProject) {
+        entry = { ...emptyEntry(), title: left.trim(), date: datedHeader ? right.trim() : '' };
+        section.entries.push(entry);
+        headerIndent = indent;
+        readOrganization = datedHeader;
+      } else if (readOrganization && right && indent === headerIndent && !/^[-•]\s/u.test(left)) {
+        entry.organization = left.trim();
+        entry.location = right.trim();
+        readOrganization = false;
+      } else {
+        if (!entry) {
+          entry = emptyEntry();
+          section.entries.push(entry);
+          headerIndent = undefined;
+        }
+        entry.body += (entry.body ? '\n' : '') + raw;
+        readOrganization = false;
+      }
     } else if (section) {
-      const entry = section.entries[0];
       entry.body += (entry.body ? '\n' : '') + line.replace(/^[•●]\s*/u, '- ');
     } else if (!summary.length && /[@]|(?:https?:\/\/|linkedin\.com|github\.com)|\b\d{8,}\b/u.test(line)) {
       cv.contacts += (cv.contacts ? '\n' : '') + line;
