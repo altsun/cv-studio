@@ -210,7 +210,7 @@ function renderPreview(cv, original = Boolean(cv?.sourcePDF) && !editablePreview
     const block = node('section', undefined, 'cv-section');
     block.append(node('h2', section.title));
     for (const entry of entries) {
-      const item = node('div', undefined, 'cv-entry');
+      const item = node('div', undefined, cv.pdfLayout ? 'cv-entry pdf-entry' : 'cv-entry');
       for (const [left, right] of [[entry.title, entry.date], [entry.organization, entry.location]]) {
         if (!left && !right) continue;
         const row = node('div', undefined, 'cv-line');
@@ -220,16 +220,32 @@ function renderPreview(cv, original = Boolean(cv?.sourcePDF) && !editablePreview
         item.append(row);
       }
       let list;
+      let listIndent;
       for (const line of entry.body.split('\n')) {
+        const indent = cv.pdfLayout ? /^ */u.exec(line)[0].length : 0;
         const bullet = /^\s*[-•]\s+/u.test(line);
-        if (bullet && !list) {
+        if (bullet && (!list || listIndent !== indent)) {
           list = node('ul');
+          if (cv.pdfLayout) list.style.paddingInlineStart = indent * 0.25 + 'em';
+          listIndent = indent;
           item.append(list);
         }
         if (!bullet) list = null;
         if (!line.trim()) continue;
         const paragraph = node(bullet ? 'li' : 'p', undefined, bullet ? '' : 'item-text');
-        inline(paragraph, bullet ? line.replace(/^\s*[-•]\s+/u, '') : line);
+        const content = bullet ? line.replace(/^\s*[-•]\s+/u, '') : line;
+        const tab = cv.pdfLayout ? content.indexOf('\t') : -1;
+        if (cv.pdfLayout && !bullet) paragraph.style.paddingInlineStart = indent * 0.25 + 'em';
+        if (tab >= 0 && !bullet) {
+          paragraph.classList.add('cv-line');
+          const left = node('span');
+          const right = node('span');
+          inline(left, content.slice(0, tab).trim());
+          inline(right, content.slice(tab + 1));
+          paragraph.append(left, right);
+        } else {
+          inline(paragraph, cv.pdfLayout ? content.trimStart() : content);
+        }
         (bullet ? list : item).append(paragraph);
       }
       block.append(item);
@@ -397,7 +413,7 @@ async function pdfText(file) {
 function reviewImport(file, text, sourcePDF, isPDF = false) {
   if (!text.trim() && !sourcePDF) throw new Error('Không tìm thấy văn bản trong tệp.');
   const importedCV = () => {
-    const cv = fromText(source);
+    const cv = fromText(source, isPDF && Boolean(source.trim()));
     if (sourcePDF && !source.trim()) cv.sourcePDF = sourcePDF;
     return cv;
   };

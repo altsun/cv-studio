@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { extractPDFPage } from './pdf-import.js';
 import { createDocument, fromText, isBackup, saveVersion, suggestVersion } from './model.js';
 
 test('custom versions stay independent of drafts and copies', () => {
@@ -39,4 +40,49 @@ test('formatted import keeps rich text inside editable CV sections', () => {
   assert.equal(cv.contacts, '[GitHub](https://github.com/example)');
   assert.equal(cv.sections[0].title, 'WORK EXPERIENCE');
   assert.equal(cv.sections[0].entries[0].body, '**Project**\n- Built [**the API**](https://example.com/api).');
+});
+
+test('PDF import retains indented subheadings and right-hand columns on the same row', async t => {
+  const item = (str, x, y, width) => ({
+    str, transform: [10, 0, 0, 10, x, y], width, height: 10, fontName: 'font', hasEOL: true,
+  });
+  const items = [
+    item('An - Engineer', 220, 760, 100),
+    item('Work Experience', 30, 720, 90),
+    item('Oct 2022 - Present', 470, 700, 100),
+    item('Software Engineer', 35, 700, 100),
+    item('Hanoi, Vietnam', 490, 688, 80),
+    item('Company', 35, 688, 50),
+    item('Awards', 42.5, 676, 40),
+    item('•', 45, 664, 4),
+    item('Recognition', 55, 664, 60),
+    item('continued', 55, 652, 50),
+    item('Certifications', 30, 630, 75),
+    item('May 2024', 520, 610, 50),
+    item('Banking Fundamentals', 35, 610, 110),
+  ];
+  const context = {
+    measureText: text => ({ width: text.length * 5 }),
+    getImageData: (x, y, width, height) => ({ data: new Uint8ClampedArray(width * height * 4) }),
+  };
+  globalThis.document = { createElement: () => ({ getContext: () => context }) };
+  t.after(() => { delete globalThis.document; });
+  const pdf = {
+    getTextContent: async () => ({ items }),
+    getAnnotations: async () => [],
+    getViewport: ({ scale }) => ({ scale, width: 600, height: 800, convertToViewportPoint: (x, y) => [x, 800 - y] }),
+    view: [0, 0, 600, 800],
+    render: () => ({ promise: Promise.resolve() }),
+    commonObjs: new Map([['font', { name: 'Arial' }]]),
+  };
+  const cv = fromText(await extractPDFPage(pdf), true);
+  assert.equal(cv.pdfLayout, true);
+  assert.deepEqual(cv.sections.map(section => section.title), ['Work Experience', 'Certifications']);
+  assert.equal(cv.sections[0].entries[0].body, [
+    '  Software Engineer\tOct 2022 - Present',
+    '  Company\tHanoi, Vietnam',
+    '     Awards',
+    '          - Recognition continued',
+  ].join('\n'));
+  assert.equal(cv.sections[1].entries[0].body, '  Banking Fundamentals\tMay 2024');
 });

@@ -28,6 +28,7 @@ function drawnBullet(context, viewport, item) {
 
 function formatLine(items, links, fonts, context) {
   const runs = [];
+  let end;
   for (const item of items) {
     const [x, y] = item.transform.slice(4);
     const font = fonts.get(item.fontName) || '';
@@ -35,6 +36,10 @@ function formatLine(items, links, fonts, context) {
     const family = /times|serif/iu.test(font) && !/sans/iu.test(font) ? 'serif' : 'sans-serif';
     context.font = (bold ? 'bold ' : '') + Math.max(1, item.height) + 'px ' + family;
     const scale = item.width / (context.measureText(item.str).width || 1);
+    const lastRun = runs.at(-1);
+    if (lastRun && x - end > item.height * 0.15 && !/\s$/u.test(lastRun.text)
+      && !/^\s/u.test(item.str)) lastRun.text += ' ';
+    end = x + item.width;
     for (const part of item.str.matchAll(/\S+|\s+/gu)) {
       const midpoint = x + scale * (context.measureText(item.str.slice(0, part.index)).width + context.measureText(part[0]).width / 2);
       const link = links.find(({ rect }) => y >= rect[1] - 1 && y <= rect[3] + 1 && midpoint >= rect[0] && midpoint <= rect[2]);
@@ -60,7 +65,8 @@ function formatLine(items, links, fonts, context) {
 
 export async function extractPDFPage(page) {
   const [{ items }, annotations] = await Promise.all([page.getTextContent(), page.getAnnotations()]);
-  if (!items.some(item => item.str?.trim())) return '';
+  const textItems = items.filter(item => item.str?.trim());
+  if (!textItems.length) return '';
   const links = annotations.filter(item => item.rect && /^(https?:\/\/|mailto:)/iu.test(item.url || ''));
   const viewport = page.getViewport({ scale: Math.min(2, 1600 / Math.max(page.view[2] - page.view[0], page.view[3] - page.view[1])), rotation: 0 });
   const canvas = document.createElement('canvas');
@@ -70,20 +76,17 @@ export async function extractPDFPage(page) {
   await page.render({ canvas, viewport }).promise;
   const fonts = new Map();
   const lines = [];
-  let row = [];
-  for (const item of items) {
-    if (item.str) {
-      if (!fonts.has(item.fontName) && page.commonObjs.has(item.fontName)) {
-        fonts.set(item.fontName, page.commonObjs.get(item.fontName).name);
-      }
-      row.push(item);
+  textItems.sort((a, b) => b.transform[5] - a.transform[5]);
+  for (const item of textItems) {
+    if (!fonts.has(item.fontName) && page.commonObjs.has(item.fontName)) {
+      fonts.set(item.fontName, page.commonObjs.get(item.fontName).name);
     }
-    if (item.hasEOL && row.length) {
-      lines.push(row);
-      row = [];
-    }
+    const row = lines.at(-1);
+    if (row && row[0].transform[5] - item.transform[5] <= 2) row.push(item);
+    else lines.push([item]);
   }
-  if (row.length) lines.push(row);
+  for (const line of lines) line.sort((a, b) => a.transform[4] - b.transform[4]);
+  const left = lines.reduce((min, line) => Math.min(min, line[0].transform[4]), Infinity);
 
   const formatted = [];
   for (const line of lines) {
@@ -91,17 +94,28 @@ export async function extractPDFPage(page) {
     if (!first) continue;
     const [x, y] = first.transform.slice(4);
     const hasBullet = marker.test(first.str) || drawnBullet(context, viewport, first);
-    let text = formatLine(line, links, fonts, context);
+    // Separate a right-hand column from the text when the PDF leaves a wide gap.
+    let column = -1;
+    for (let i = 1; i < line.length; i++) {
+      const previous = line[i - 1];
+      const gap = line[i].transform[4] - previous.transform[4] - previous.width;
+      if (gap > first.height * 3 && line[i].transform[4] > (page.view[0] + page.view[2]) / 2) column = i;
+    }
+    let text = formatLine(column < 0 ? line : line.slice(0, column), links, fonts, context);
+    if (column >= 0) text += '\t' + formatLine(line.slice(column), links, fonts, context);
     const prior = formatted.at(-1);
     if (hasBullet) {
       text = '- ' + text.replace(/^(\*\*)?(?:[•●▪◦‣]|-\s)\s*(\*\*)?\s*/u,
         (_, opening, closing) => opening && !closing ? opening : '');
     }
-    if (!hasBullet && prior?.bullet && Math.abs(x - prior.x) < 1.5 && prior.y - y > 0 && prior.y - y < first.height * 1.8) {
+    if (!text.includes('\t') && !hasBullet && prior?.bullet && Math.abs(x - prior.x) < 1.5 && prior.y - y > 0 && prior.y - y < first.height * 1.8) {
       prior.text += ' ' + text;
       prior.y = y;
     } else {
-      formatted.push({ text, x, y, bullet: hasBullet });
+      const contentX = marker.test(first.str) && line[1] && !first.str.replace(marker, '').trim()
+        ? line[1].transform[4] : x;
+      const indent = Math.round((contentX - left) / (first.height * 0.25 || 2));
+      formatted.push({ text: ' '.repeat(indent) + text, x: contentX, y, bullet: hasBullet });
     }
   }
   return formatted.map(line => line.text).join('\n');

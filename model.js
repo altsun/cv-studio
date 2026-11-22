@@ -48,22 +48,24 @@ export function isBackup(backup) {
       && new Set(doc.versions.map(v => v.label.trim().toLowerCase())).size === doc.versions.length);
 }
 
-export function fromText(text) {
-  const lines = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+export function fromText(text, pdfLayout = false) {
+  const lines = text.split(/\r?\n/).filter(line => line.trim());
   const cv = emptyCV();
-  [cv.name, cv.role = ''] = (lines.shift() || '').replace(/^\*\*(.+)\*\*$/u, '$1').split(/\s+[-–|]\s+(.+)/u, 2);
+  if (pdfLayout) cv.pdfLayout = true;
+  [cv.name, cv.role = ''] = (lines.shift() || '').trim().replace(/^\*\*(.+)\*\*$/u, '$1').split(/\s+[-–|]\s+(.+)/u, 2);
   cv.sections = [];
   const headings = /^(work experience|experience|professional experience|projects|skills|technical skills|certifications|education|languages|awards|kinh nghiệm|dự án|kỹ năng|chứng chỉ|học vấn|ngoại ngữ|kinh nghiệm làm việc)$/iu;
   let section;
   const summary = [];
-  for (const line of lines) {
+  for (const raw of lines) {
+    const line = raw.trim();
     const heading = line.replace(/^\*\*(.+)\*\*$/u, '$1');
-    if (headings.test(heading)) {
+    if (headings.test(heading) && (!pdfLayout || raw === raw.trimStart())) {
       section = { title: heading, hidden: false, entries: [emptyEntry()] };
       cv.sections.push(section);
     } else if (section) {
       const entry = section.entries[0];
-      entry.body += (entry.body ? '\n' : '') + line.replace(/^[•●]\s*/u, '- ');
+      entry.body += (entry.body ? '\n' : '') + (pdfLayout ? raw : line.replace(/^[•●]\s*/u, '- '));
     } else if (!summary.length && /[@]|(?:https?:\/\/|linkedin\.com|github\.com)|\b\d{8,}\b/u.test(line)) {
       cv.contacts += (cv.contacts ? '\n' : '') + line;
     } else {

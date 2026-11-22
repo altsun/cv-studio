@@ -42,6 +42,8 @@ details[open] summary{margin-bottom:12px}
 .cv-section{margin-top:8px}
 .cv-section h2{font-size:1em;text-transform:uppercase;border-bottom:1px solid;padding-bottom:3px;margin:0 0 3px;break-after:avoid}
 .cv-entry{padding-left:6px;margin:0 0 4px}
+.cv-entry.pdf-entry{padding-left:0}
+.pdf-entry p.cv-line>span:last-child{font-weight:inherit}
 .cv-line{display:flex;justify-content:space-between;gap:10px;break-after:avoid}
 .cv-line span:last-child{text-align:right;font-weight:700}
 .paper ul{margin:2px 0;padding-left:17px}
