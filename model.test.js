@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { extractPDFPage } from './pdf-import.js';
-import { createDocument, fromText, isBackup, saveVersion, suggestVersion } from './model.js';
+import { createDocument, fromText, isBackup, matchesLatestVersion, saveVersion, suggestVersion } from './model.js';
 
 test('custom versions stay independent of drafts and copies', () => {
   const doc = createDocument('Software Engineer');
@@ -17,6 +17,20 @@ test('custom versions stay independent of drafts and copies', () => {
   assert.equal(original.cv.name, 'An');
   assert.equal(isBackup({ format: 'cv-studio-v1', documents: [doc, copy] }), true);
   assert.equal(isBackup({ format: 'cv-studio-v1', documents: [{}] }), false);
+});
+
+test('matches the latest saved CV by content', () => {
+  const doc = createDocument('CV');
+  assert.equal(matchesLatestVersion(doc), false);
+  const first = saveVersion(doc, 'v1', '');
+  doc.draft = Object.fromEntries(Object.entries(doc.draft).reverse());
+  assert.equal(matchesLatestVersion(doc), true);
+  const duplicate = saveVersion(doc, 'v2', '');
+  assert.deepEqual(duplicate.cv, first.cv);
+  doc.draft.sections.reverse();
+  assert.equal(matchesLatestVersion(doc), false);
+  saveVersion(doc, 'v3', '');
+  assert.equal(matchesLatestVersion(doc, first.cv), false);
 });
 
 test('text import preserves headings, contact information and bullets', () => {

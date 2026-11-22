@@ -9,6 +9,15 @@ export function createDocument(label, draft = emptyCV(), versions = []) {
   return { id: crypto.randomUUID(), label, draft: structuredClone(draft), versions: structuredClone(versions) };
 }
 
+export function matchesLatestVersion(document, cv = document.draft) {
+  const latest = document.versions[0];
+  if (!latest) return false;
+  const sortKeys = (_, value) => value && typeof value === 'object' && !Array.isArray(value)
+    ? Object.fromEntries(Object.keys(value).sort().map(key => [key, value[key]]))
+    : value;
+  return JSON.stringify(cv, sortKeys) === JSON.stringify(latest.cv, sortKeys);
+}
+
 export function saveVersion(document, label, note, draft = document.draft) {
   label = label.trim();
   if (!label || label.length > 60) throw new Error('Nhập số phiên bản từ 1 đến 60 ký tự.');

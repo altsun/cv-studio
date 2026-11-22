@@ -1,5 +1,5 @@
 import { extractPDFPage } from './pdf-import.js';
-import { createDocument, emptyEntry, fromText, isBackup, saveVersion, suggestVersion } from './model.js';
+import { createDocument, emptyEntry, fromText, isBackup, matchesLatestVersion, saveVersion, suggestVersion } from './model.js';
 
 const $ = id => document.getElementById(id);
 const storageKey = 'cv-studio-v1';
@@ -371,13 +371,13 @@ function showDialog(title, ...content) {
   if (!$('dialog').open) $('dialog').showModal();
 }
 
-function exportPDF(version) {
+function exportPDF(cv) {
   $('dialog').close();
   const filename = (active().label.trim() || 'CV').replace(/[<>:"/\\|?*\u0000-\u001f]/gu, '-').replace(/[. ]+$/u, '') || 'CV';
   const frame = node('iframe', undefined, 'print-frame');
   frame.title = 'Bản in CV';
   frame.tabIndex = -1;
-  renderPreview(version.cv, false, false);
+  renderPreview(cv, false, false);
   const paper = $('paper').cloneNode(true);
   renderPreview(active()?.draft);
 
@@ -399,7 +399,7 @@ function exportPDF(version) {
   document.body.append(frame);
 }
 
-function versionForm(title, onSave, target = active(), cv = target.draft) {
+function versionForm(title, onSave, target = active(), cv = target.draft, onDecline) {
   const form = node('form');
   const label = node('label', 'Số phiên bản');
   const number = node('input');
@@ -415,9 +415,16 @@ function versionForm(title, onSave, target = active(), cv = target.draft) {
   error.setAttribute('role', 'alert');
   const save = node('button', title, 'primary');
   save.type = 'submit';
+  const unchanged = matchesLatestVersion(target, cv);
+  save.formNoValidate = unchanged;
   form.append(label, noteLabel, error, save);
   form.addEventListener('submit', event => {
     event.preventDefault();
+    if (unchanged && !window.confirm('Nội dung giống phiên bản lưu gần nhất. Bạn có muốn tạo phiên bản mới không?')) {
+      $('dialog').close();
+      onDecline?.(cv);
+      return;
+    }
     try {
       const version = saveVersion(target, number.value, note.value.trim(), cv);
       $('dialog').close();
@@ -456,13 +463,13 @@ function showVersions(print = false) {
         versionForm('Lưu bản nháp rồi khôi phục', restore),
         button('Khôi phục ngay', restore));
     }));
-    actions.append(button('Xuất PDF', () => exportPDF(version)));
+    actions.append(button('Xuất PDF', () => exportPDF(version.cv)));
     item.append(actions);
     return item;
   });
   showDialog(print ? 'Xuất PDF' : 'Lịch sử phiên bản',
     ...(print ? [node('p', 'Chọn “Lưu dưới dạng PDF” trong hộp thoại in và tắt đầu trang, chân trang nếu đang bật.', 'muted'),
-      versionForm('Lưu phiên bản và xuất PDF', version => { persist(); exportPDF(version); })] : []),
+      versionForm('Lưu phiên bản và xuất PDF', version => { persist(); exportPDF(version.cv); }, doc, doc.draft, exportPDF)] : []),
     ...(versions.length ? versions : [node('p', 'Chưa có phiên bản đã lưu.', 'muted')]));
 }
 
@@ -560,7 +567,7 @@ $('delete').onclick = () => {
 };
 $('history').onclick = () => showVersions();
 $('export').onclick = () => showVersions(true);
-$('save').onclick = () => showDialog('Lưu phiên bản', versionForm('Lưu phiên bản', persist));
+$('save').onclick = () => showDialog('Lưu phiên bản', versionForm('Lưu phiên bản', () => persist()));
 $('add-section').onclick = () => {
   const sections = active().draft.sections;
   sections.push({ title: 'Mục mới', hidden: false, entries: [emptyEntry()] });
