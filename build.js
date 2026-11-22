@@ -3,23 +3,36 @@ import { examples } from './examples.js';
 
 const domain = 'https://cv-studio-phi.vercel.app';
 const assets = ['style.css', 'app.js', 'model.js', 'pdf-import.js', 'studio.js', 'translations.js', 'examples.js', 'og.png'];
-const industry = examples.map(example => {
-  const path = '/mau-cv/' + example.slug + '/';
-  const title = 'Mẫu CV ' + example.title;
-  return {
-    path, title, description: example.tips,
-    body: '<p>' + example.summary + '</p><section class="card"><h2>Kinh nghiệm</h2><p><strong>' + example.role + '</strong> · ' + example.organization + '</p><ul>'
-      + example.body.split('\n').map(line => '<li>' + line.slice(2) + '</li>').join('')
-      + '</ul></section><p>' + example.tips + '</p><p><a href="/?mau=' + example.slug + '">Dùng mẫu này trong CV Studio</a></p><p><a href="/mau-cv/">Xem tất cả mẫu</a></p>',
-  };
+const pages = ['vi', 'en'].flatMap(lang => {
+  const english = lang === 'en';
+  const library = english ? '/en/mau-cv/' : '/mau-cv/';
+  const alternateLibrary = english ? '/mau-cv/' : '/en/mau-cv/';
+  const editor = '/?lang=' + lang;
+  const industry = examples.map(example => {
+    const content = english ? example.en : example;
+    const suffix = example.slug + '/';
+    const title = english ? content.title + ' Resume Example' : 'Mẫu CV ' + content.title;
+    const experience = english ? 'Experience' : 'Kinh nghiệm';
+    const useSample = english ? 'Use this example in CV Studio' : 'Dùng mẫu này trong CV Studio';
+    const allSamples = english ? 'See all examples' : 'Xem tất cả mẫu';
+    return {
+      lang, path: library + suffix, alternate: alternateLibrary + suffix, title, description: content.tips,
+      body: '<p>' + content.summary + '</p><section class="card"><h2>' + experience + '</h2><p><strong>' + content.role + '</strong> · ' + content.organization + '</p><ul>'
+        + content.body.split('\n').map(line => '<li>' + line.slice(2) + '</li>').join('')
+        + '</ul></section><p>' + content.tips + '</p><p><a href="' + editor + '&amp;mau=' + example.slug + '">' + useSample + '</a></p><p><a href="' + library + '">' + allSamples + '</a></p>',
+    };
+  });
+  const intro = english ? 'Choose an example to see sample experience and open a copy in the editor.' : 'Chọn một mẫu để xem ví dụ kinh nghiệm và mở bản sao trong trình chỉnh sửa.';
+  const openEditor = english ? 'Open the resume editor' : 'Mở trình chỉnh sửa CV';
+  return [{
+    lang, path: library, alternate: alternateLibrary,
+    title: english ? 'Resume Examples by Industry' : 'Tạo CV theo ngành với CV Studio',
+    description: english ? 'Explore technology, marketing, and accounting resume examples. Edit an example and export it as an A4 PDF.' : 'Tham khảo mẫu CV công nghệ, marketing và kế toán. Chỉnh sửa mẫu rồi xuất PDF A4.',
+    body: '<p>' + intro + '</p><ul>'
+      + industry.map(page => '<li><a href="' + page.path + '">' + page.title + '</a></li>').join('')
+      + '</ul><p><a href="' + editor + '">' + openEditor + '</a></p>',
+  }, ...industry];
 });
-const pages = [{
-  path: '/mau-cv/', title: 'Tạo CV theo ngành với CV Studio',
-  description: 'Tham khảo mẫu CV công nghệ, marketing và kế toán. Chỉnh sửa mẫu rồi xuất PDF A4.',
-  body: '<p>Chọn một mẫu để xem ví dụ kinh nghiệm và mở bản sao trong trình chỉnh sửa.</p><ul>'
-    + industry.map(page => '<li><a href="' + page.path + '">' + page.title + '</a></li>').join('')
-    + '</ul><p><a href="/">Mở trình chỉnh sửa CV</a></p>',
-}, ...industry];
 
 let analytics = null;
 try {
@@ -40,16 +53,19 @@ await Promise.all([
   copyFile('node_modules/pdfjs-dist/build/pdf.min.mjs', 'dist/vendor/pdf.mjs'),
   copyFile('node_modules/pdfjs-dist/build/pdf.worker.min.mjs', 'dist/vendor/pdf.worker.mjs'),
   copyFile('node_modules/pdfjs-dist/LICENSE', 'dist/vendor/LICENSE.txt'),
-  ...pages.map(async ({ path, title, description, body }) => {
+  ...pages.map(async ({ lang, path, alternate, title, description, body }) => {
+    const otherLanguage = lang === 'en' ? 'vi' : 'en';
     const directory = 'dist' + path;
     await mkdir(directory, { recursive: true });
     await writeFile(directory + 'index.html', `<!doctype html>
-<html lang="vi">
+<html lang="${lang}">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${title} | CV Studio</title>
 <meta name="description" content="${description}">
 <link rel="canonical" href="${domain + path}">
+<link rel="alternate" hreflang="${lang}" href="${domain + path}">
+<link rel="alternate" hreflang="${otherLanguage}" href="${domain + alternate}">
 <meta property="og:type" content="website">
 <meta property="og:title" content="${title}">
 <meta property="og:description" content="${description}">
@@ -59,7 +75,7 @@ await Promise.all([
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-<header class="bar"><a class="brand" href="/"><span aria-hidden="true">CV</span> CV Studio</a></header>
+<header class="bar"><a class="brand" href="/?lang=${lang}"><span aria-hidden="true">CV</span> CV Studio</a><a href="${alternate}" hreflang="${otherLanguage}" lang="${otherLanguage}">${lang === 'en' ? 'Tiếng Việt' : 'English'}</a></header>
 <main class="landing"><h1>${title}</h1>${body}</main>
 </body>
 </html>`);

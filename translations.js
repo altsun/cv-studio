@@ -128,12 +128,17 @@ Dùng “- ” cho gạch đầu dòng, **chữ** để in đậm và [tên](htt
 
 let locale = 'vi';
 try { if (localStorage.getItem('cv-studio-language') === 'en') locale = 'en'; } catch {}
+const requestedLocale = new URLSearchParams(globalThis.location?.search).get('lang');
+if (requestedLocale === 'vi' || requestedLocale === 'en') locale = requestedLocale;
 export const language = () => locale;
 export const translate = text => locale === 'en' && Object.hasOwn(english, text) ? english[text] : text;
 
 export function setLanguage(value) {
   locale = value === 'en' ? 'en' : 'vi';
   document.documentElement.lang = locale;
+  for (const link of document.querySelectorAll('a[data-i18n="Mẫu theo ngành"]')) {
+    link.href = locale === 'en' ? '/en/mau-cv/' : '/mau-cv/';
+  }
   try { localStorage.setItem('cv-studio-language', locale); } catch {}
   for (const element of document.querySelectorAll('[data-i18n]')) element.textContent = translate(element.dataset.i18n);
   for (const element of document.querySelectorAll('[data-i18n-aria]')) element.setAttribute('aria-label', translate(element.dataset.i18nAria));

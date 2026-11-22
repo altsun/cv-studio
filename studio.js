@@ -199,7 +199,8 @@ export function installExtras({ active, addDocument, showDialog, render }) {
 
   const example = examples.find(item => item.slug === new URLSearchParams(location.search).get('mau'));
   if (example && !location.hash) {
-    addDocument(createDocument(example.role, exampleCV(example)));
+    const cv = exampleCV(example, language());
+    addDocument(createDocument(cv.role, cv));
     history.replaceState(null, '', location.pathname);
   }
 
