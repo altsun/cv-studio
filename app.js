@@ -1,5 +1,5 @@
 import { translate, setLanguage, language } from './translations.js';
-import { addAppearance, applyAppearance, compareCV, installExtras, track } from './studio.js';
+import { addAppearance, applyAppearance, compareCV, installExtras, repairDocumentAppearance, track } from './studio.js';
 import { extractPDFPage } from './pdf-import.js';
 import { createDocument, emptyEntry, fromText, isBackup, matchesLatestVersion, saveVersion, suggestVersion } from './model.js';
 
@@ -19,7 +19,10 @@ let state = { documents: [sample], active: sample.id };
 try {
   const stored = JSON.parse(localStorage.getItem(storageKey));
   if (stored?.documents?.length === 0 && stored.active === null) state = stored;
-  else if (isBackup({ ...stored, format: storageKey }) && stored.documents.some(doc => doc.id === stored.active)) state = stored;
+  else if (isBackup({ ...stored, format: storageKey }) && stored.documents.some(doc => doc.id === stored.active)) {
+    stored.documents.forEach(repairDocumentAppearance);
+    state = stored;
+  }
 } catch {
   // Start with the sample if local storage is unavailable or contains invalid data.
 }
@@ -517,7 +520,7 @@ function render(openSections) {
 }
 
 function addDocument(doc) {
-  state.documents.push(doc);
+  state.documents.push(repairDocumentAppearance(doc));
   state.active = doc.id;
   refresh();
 }
@@ -771,7 +774,7 @@ $('file').onchange = async event => {
       const backup = JSON.parse((await file.text()).replace(/^\uFEFF/u, ''));
       if (backup?.version !== undefined && backup.version !== 1) throw new Error('Phiên bản tệp sao lưu chưa được hỗ trợ.');
       if (!isBackup(backup)) throw new Error('Tệp sao lưu CV Studio không hợp lệ.');
-      const documents = backup.documents.map(doc => createDocument(doc.label, doc.draft, doc.versions));
+      const documents = backup.documents.map(doc => repairDocumentAppearance(createDocument(doc.label, doc.draft, doc.versions)));
       state.documents.push(...documents);
       state.active = documents[0].id;
       refresh();

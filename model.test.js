@@ -33,6 +33,32 @@ test('matches the latest saved CV by content', () => {
   assert.equal(matchesLatestVersion(doc, first.cv), false);
 });
 
+test('repairs layout settings in saved drafts and versions without discarding CV content', async t => {
+  globalThis.document = { documentElement: { dataset: {} } };
+  t.after(() => { delete globalThis.document; });
+  const { applyAppearance, repairDocumentAppearance } = await import('./studio.js');
+
+  const doc = createDocument('CV');
+  doc.draft.name = 'An';
+  doc.draft.appearance = { template: 'nodeflair', color: '#123abc', margin: 12 };
+  const version = saveVersion(doc, 'v1', '');
+  doc.draft.appearance.color = ['#123abc'];
+  version.cv.appearance.template = ['nodeflair'];
+  const stored = JSON.parse(JSON.stringify({ format: 'cv-studio-v1', documents: [doc] }));
+  assert.equal(isBackup(stored), true);
+
+  const repaired = repairDocumentAppearance(stored.documents[0]);
+  assert.equal(repaired.draft.name, 'An');
+  assert.deepEqual(repaired.draft.appearance, { template: 'nodeflair', margin: 12 });
+  assert.deepEqual(repaired.versions[0].cv.appearance, { color: '#123abc', margin: 12 });
+
+  const styles = new Map();
+  const paper = { dataset: {}, style: { setProperty: (name, value) => styles.set(name, value) } };
+  applyAppearance(paper, repaired.draft);
+  assert.equal(paper.dataset.template, 'nodeflair');
+  assert.equal(styles.get('--accent'), '#202c3c');
+});
+
 test('text import preserves headings, contact information and bullets', () => {
   const cv = fromText('Nguyễn An - Software Engineer\nan@example.com\nGiới thiệu\nWORK EXPERIENCE\n• Built APIs');
   assert.equal(cv.name, 'Nguyễn An');

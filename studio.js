@@ -21,14 +21,27 @@ function templateDefaults(template) {
 
 function appearance(cv) {
   const saved = cv?.appearance;
-  const template = Object.hasOwn(templates, saved?.template) ? saved.template : defaults.template;
+  const template = typeof saved?.template === 'string' && Object.hasOwn(templates, saved.template)
+    ? saved.template : defaults.template;
   const base = templateDefaults(template);
   const options = { ...base, ...saved, template };
-  if (!/^#[a-f0-9]{6}$/i.test(options.color)) options.color = base.color;
+  if (typeof options.color !== 'string' || !/^#[a-f0-9]{6}$/i.test(options.color)) options.color = base.color;
   for (const [key, [min, max]] of Object.entries(metrics)) {
     if (!Number.isFinite(options[key]) || options[key] < min || options[key] > max) options[key] = base[key];
   }
   return options;
+}
+
+export function repairDocumentAppearance(doc) {
+  for (const cv of [doc.draft, ...doc.versions.map(version => version.cv)]) {
+    if (!cv.appearance) continue;
+    const options = appearance(cv);
+    for (const key of Object.keys(defaults)) {
+      if (cv.appearance[key] !== options[key]) delete cv.appearance[key];
+    }
+    if (Object.keys(cv.appearance).length === 0) delete cv.appearance;
+  }
+  return doc;
 }
 
 export function applyAppearance(paper, cv) {
