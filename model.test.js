@@ -158,3 +158,25 @@ test('job matching deduplicates NFC terms and ignores hidden sections and empty 
   });
   assert.deepEqual(jobMatch(cv, 'and the'), { count: 0, score: 0, missing: [] });
 });
+
+test('job matching does not count ordinary English go or Vietnamese ai in a description', () => {
+  const cv = { role: '', summary: 'ability design production biết làm việc', sections: [] };
+  assert.deepEqual(jobMatch(cv, 'ability to go from design to production. ai biết làm việc'), {
+    count: 5, score: 100, missing: [],
+  });
+  assert.deepEqual(jobMatch(cv, 'go ai'), { count: 0, score: 0, missing: [] });
+});
+
+test('ordinary words in the CV do not satisfy explicit Go and AI requirements', () => {
+  const cv = { role: '', summary: 'ability to go from design to production. ai biết làm việc', sections: [] };
+  assert.deepEqual(jobMatch(cv, 'Go, AI, GO, AI.'), {
+    count: 2, score: 0, missing: ['go', 'ai'],
+  });
+});
+
+test('conventional Go and AI spellings match without changing other technology matching', () => {
+  const cv = { role: '', summary: 'Go AI ci/cd c# .NET node.js', sections: [] };
+  assert.deepEqual(jobMatch(cv, 'GO AI CI/CD C# .net Node.js. go ai'), {
+    count: 7, score: 100, missing: [],
+  });
+});
