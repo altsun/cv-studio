@@ -1,5 +1,5 @@
 import { examples, exampleCV } from './examples.js';
-import { createDocument, isCV } from './model.js';
+import { createDocument, isCV, jobMatch } from './model.js';
 import { translate, setLanguage, language } from './translations.js';
 
 const $ = id => document.getElementById(id);
@@ -171,16 +171,6 @@ function shareURL(cv) {
   url.search = '';
   url.hash = 'cv=' + btoa(String.fromCharCode(...bytes)).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
   return url.href;
-}
-
-const words = text => new Set(text.toLowerCase().normalize('NFC').match(/[\p{L}\p{N}][\p{L}\p{N}+#.-]*/gu)?.filter(word => word.length > 2) ?? []);
-const stop = words('and the with for from you your our have about will are this that can các của cho trong một với việc được tại theo cần yêu cầu và hoặc');
-function jobMatch(cv, description) {
-  const target = [...words(description)].filter(word => !stop.has(word));
-  const source = words([cv.role, cv.summary, ...cv.sections.filter(section => !section.hidden)
-    .flatMap(section => [section.title, ...section.entries.flatMap(entry => Object.values(entry))])].join(' '));
-  const missing = target.filter(word => !source.has(word));
-  return { count: target.length, score: Math.round((1 - missing.length / target.length) * 100), missing };
 }
 
 export function installExtras({ active, addDocument, showDialog, render }) {

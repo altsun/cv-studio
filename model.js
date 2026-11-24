@@ -117,3 +117,28 @@ export function fromText(text, pdfLayout = false) {
   cv.summary = summary.join('\n');
   return cv;
 }
+
+// Keep technology punctuation, but never treat a sentence-ending period as part of a word.
+const shortSkills = new Set(['ai', 'c', 'c#', 'cd', 'ci', 'f#', 'go', 'js', 'ml', 'qa', 'r', 'ts', 'ui', 'ux']);
+// Bare lowercase "go" (English) and "ai" (Vietnamese) are ordinary words.
+// Require their conventional technology spellings before folding case for matching.
+const ambiguousShortSkills = new Map([['go', ['Go', 'GO']], ['ai', ['AI']]]);
+const words = text => {
+  const result = new Set();
+  for (const token of text.normalize('NFC').match(/(?:\.net\b|[\p{L}\p{N}]+(?:[.-][\p{L}\p{N}]+)*(?:\+\+|#)?)/giu) ?? []) {
+    const word = token.toLowerCase().normalize('NFC');
+    const spellings = ambiguousShortSkills.get(word);
+    if ((word.length > 2 || shortSkills.has(word)) && (!spellings || spellings.includes(token))) {
+      result.add(word);
+    }
+  }
+  return result;
+};
+const stop = words('and the with for from you your our have about will are this that can các của cho trong một với việc được tại theo cần yêu cầu và hoặc');
+export function jobMatch(cv, description) {
+  const target = [...words(description)].filter(word => !stop.has(word));
+  const source = words([cv.role, cv.summary, ...cv.sections.filter(section => !section.hidden)
+    .flatMap(section => [section.title, ...section.entries.flatMap(entry => Object.values(entry))])].join(' '));
+  const missing = target.filter(word => !source.has(word));
+  return { count: target.length, score: target.length ? Math.round((1 - missing.length / target.length) * 100) : 0, missing };
+}

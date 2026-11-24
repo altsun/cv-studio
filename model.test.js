@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { extractPDFPage } from './pdf-import.js';
-import { createDocument, fromText, isBackup, matchesLatestVersion, saveVersion, suggestVersion } from './model.js';
+import { createDocument, fromText, isBackup, jobMatch, matchesLatestVersion, saveVersion, suggestVersion } from './model.js';
 
 test('custom versions stay independent of drafts and copies', () => {
   const doc = createDocument('Software Engineer');
@@ -138,4 +138,45 @@ test('PDF import groups each job with its organization, projects and bullets', a
   ]);
   assert.equal(cv.sections[1].entries[0].title, 'Banking Fundamentals');
   assert.equal(cv.sections[1].entries[0].date, 'May 2024');
+});
+
+
+test('job matching recognizes short technology names without trailing punctuation', () => {
+  const cv = { role: 'Platform engineer', summary: 'Go, R, C++, C#, .NET, Node.js, SQL.', sections: [] };
+  assert.deepEqual(jobMatch(cv, 'Go. R, C++! C#; .NET and Node.js. SQL and Rust.'), {
+    count: 8, score: 88, missing: ['rust'],
+  });
+});
+
+test('job matching deduplicates NFC terms and ignores hidden sections and empty descriptions', () => {
+  const cv = { role: 'Vận hành', summary: '', sections: [
+    { title: 'Skills', hidden: false, entries: [{ body: 'CI/CD' }] },
+    { title: 'Python', hidden: true, entries: [{ body: 'Rust' }] },
+  ] };
+  assert.deepEqual(jobMatch(cv, 'HÀNH hành CI/CD python rust'.normalize('NFD')), {
+    count: 5, score: 60, missing: ['python', 'rust'],
+  });
+  assert.deepEqual(jobMatch(cv, 'and the'), { count: 0, score: 0, missing: [] });
+});
+
+test('job matching does not count ordinary English go or Vietnamese ai in a description', () => {
+  const cv = { role: '', summary: 'ability design production biết làm việc', sections: [] };
+  assert.deepEqual(jobMatch(cv, 'ability to go from design to production. ai biết làm việc'), {
+    count: 5, score: 100, missing: [],
+  });
+  assert.deepEqual(jobMatch(cv, 'go ai'), { count: 0, score: 0, missing: [] });
+});
+
+test('ordinary words in the CV do not satisfy explicit Go and AI requirements', () => {
+  const cv = { role: '', summary: 'ability to go from design to production. ai biết làm việc', sections: [] };
+  assert.deepEqual(jobMatch(cv, 'Go, AI, GO, AI.'), {
+    count: 2, score: 0, missing: ['go', 'ai'],
+  });
+});
+
+test('conventional Go and AI spellings match without changing other technology matching', () => {
+  const cv = { role: '', summary: 'Go AI ci/cd c# .NET node.js', sections: [] };
+  assert.deepEqual(jobMatch(cv, 'GO AI CI/CD C# .net Node.js. go ai'), {
+    count: 7, score: 100, missing: [],
+  });
 });
