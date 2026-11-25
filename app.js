@@ -1,7 +1,7 @@
 import { translate, setLanguage, language } from './translations.js';
 import { addAppearance, applyAppearance, compareCV, installExtras, repairDocumentAppearance, track } from './studio.js';
 import { extractPDFPage } from './pdf-import.js';
-import { createDocument, emptyEntry, fromText, isBackup, matchesLatestVersion, saveVersion, suggestVersion } from './model.js';
+import { createDocument, emptyEntry, fromText, isBackup, matchesLatestVersion, saveVersion, suggestVersion, visibleSections } from './model.js';
 
 const $ = id => document.getElementById(id);
 const storageKey = 'cv-studio-v1';
@@ -85,6 +85,8 @@ function reorder(handle, target, items, index, renderMoved) {
 }
 
 const editablePreviews = new WeakSet();
+let displayedCV;
+let displayingOriginalPDF = false;
 const active = () => state.documents.find(doc => doc.id === state.active);
 const node = (tag, text, className) => {
   const element = document.createElement(tag);
@@ -400,6 +402,8 @@ function setPageCount(pages) {
 
 function renderPreview(cv, original = Boolean(cv?.sourcePDF) && !editablePreviews.has(cv), paginate = true) {
   reflowPreview = undefined;
+  displayedCV = cv;
+  displayingOriginalPDF = original;
   const paper = $('paper');
   paper.classList.toggle('paginated-paper', Boolean(cv) && !original && paginate);
 
@@ -439,9 +443,8 @@ function renderPreview(cv, original = Boolean(cv?.sourcePDF) && !editablePreview
   inline(summary, cv.summary);
   const content = node('div');
   content.append(head, summary);
-  for (const section of cv.sections) {
-    const entries = section.entries.filter(entry => Object.values(entry).some(value => typeof value === 'string' && value.trim()));
-    if (section.hidden || !entries.length) continue;
+  for (const section of visibleSections(cv)) {
+    const entries = section.entries;
     const block = node('section', undefined, 'cv-section');
     block.append(Object.assign(node('h2'), { textContent: section.title }));
     for (const entry of entries) {
@@ -799,5 +802,7 @@ $('undo').onclick = () => travel(undo, redo);
 $('redo').onclick = () => travel(redo, undo);
 updateHistoryButtons();
 setLanguage(language());
-installExtras({ active, addDocument, showDialog, render });
+installExtras({ active, addDocument, showDialog, render,
+  currentPreview: () => ({ cv: displayedCV, original: displayingOriginalPDF }),
+});
 refresh();

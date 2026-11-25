@@ -1,5 +1,10 @@
 {
   "framework": null,
   "buildCommand": "npm run build",
-  "outputDirectory": "dist"
+  "outputDirectory": "dist",
+  "git": {
+    "deploymentEnabled": {
+      "fix/share-visible-cv-20261125": false
+    }
+  }
 }

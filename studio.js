@@ -1,5 +1,5 @@
 import { examples, exampleCV } from './examples.js';
-import { createDocument, isCV, jobMatch } from './model.js';
+import { createDocument, isCV, jobMatch, visibleSections } from './model.js';
 import { translate, setLanguage, language } from './translations.js';
 
 const $ = id => document.getElementById(id);
@@ -164,16 +164,96 @@ export function track(event) {
   }
 }
 
-function shareURL(cv) {
-  const bytes = new TextEncoder().encode(JSON.stringify({ ...cv, sourcePDF: undefined }));
+// Keep sharing separate from backup and document/version storage. Allowlist
+// fields at every level, rather than spreading a potentially extended CV.
+export function sharePayload(cv) {
+  const options = appearance(cv);
+  return {
+    name: cv.name,
+    role: cv.role,
+    contacts: cv.contacts,
+    summary: cv.summary,
+    sections: visibleSections(cv),
+    appearance: Object.fromEntries(Object.keys(defaults).map(key => [key, options[key]])),
+    ...(cv.pdfLayout ? { pdfLayout: true } : {}),
+  };
+}
+
+export function shareURL(cv, baseURL = location.href) {
+  const bytes = new TextEncoder().encode(JSON.stringify(sharePayload(cv)));
   if (bytes.length > 12000) throw new Error(translate('CV quá dài để tạo liên kết. Hãy chia sẻ tệp PDF.'));
-  const url = new URL(location.href);
+  const url = new URL(baseURL);
   url.search = '';
   url.hash = 'cv=' + btoa(String.fromCharCode(...bytes)).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
   return url.href;
 }
 
-export function installExtras({ active, addDocument, showDialog, render }) {
+// Read the original format as well as the new projected payload. Do not
+// sanitize old links on import: users may still need their hidden sections.
+export function decodeSharedCV(hash) {
+  if (!hash.startsWith('#cv=')) throw new Error();
+  const shared = hash.slice(4);
+  if (shared.length > 16000) throw new Error();
+  const bytes = Uint8Array.from(atob(shared.replaceAll('-', '+').replaceAll('_', '/')), char => char.charCodeAt(0));
+  const cv = JSON.parse(new TextDecoder().decode(bytes));
+  if (!isCV(cv) || cv.sourcePDF) throw new Error();
+  return cv;
+}
+
+export function showSharePreview({ cv, original }, showDialog) {
+  if (!cv) return;
+  if (original) {
+    showDialog('Chia sẻ CV', element('p', 'Không thể chia sẻ PDF gốc qua liên kết CV. Hãy chuyển sang Bản chỉnh sửa để xem nội dung có thể chia sẻ.'));
+    return;
+  }
+  // Capture a detached snapshot once. Confirmation cannot pick up later
+  // changes to the draft or accidentally select a different version.
+  const payload = sharePayload(cv);
+  const preview = element('textarea', '');
+  Object.assign(preview, {
+    readOnly: true,
+    rows: 12,
+    value: [
+      [payload.name, payload.role, payload.contacts, payload.summary].filter(Boolean).join('\n\n'),
+      ...payload.sections.map(section => [
+        section.title,
+        ...section.entries.map(entry => [entry.title, entry.date, entry.organization, entry.location, entry.body]
+          .filter(Boolean).join('\n')),
+      ].join('\n\n')),
+    ].filter(Boolean).join('\n\n'),
+  });
+  const previewLabel = element('label', 'Nội dung sẽ được chia sẻ');
+  previewLabel.append(preview);
+
+  const details = element('details', '');
+  details.append(element('summary', 'Xem dữ liệu chính xác trong liên kết'));
+  const raw = element('textarea', '');
+  Object.assign(raw, { readOnly: true, rows: 8, value: JSON.stringify(payload, null, 2) });
+  const rawLabel = element('label', 'Dữ liệu JSON');
+  rawLabel.append(raw);
+  details.append(rawLabel);
+
+  const warning = 'Ai có liên kết đều đọc được nội dung CV. Hãy kiểm tra thông tin cá nhân trước khi gửi.';
+  const confirm = button('Tạo liên kết chia sẻ', () => {
+    try {
+      const input = element('input', '');
+      Object.assign(input, { value: shareURL(payload), readOnly: true });
+      const label = element('label', 'Liên kết CV');
+      label.append(input);
+      showDialog('Chia sẻ CV', element('p', warning), label);
+      input.focus();
+      input.select();
+    } catch (error) {
+      showDialog('Chia sẻ CV', element('p', error.message));
+    }
+  });
+  confirm.className = 'primary';
+  showDialog('Xem trước phạm vi chia sẻ', element('p', warning),
+    element('p', 'Chỉ bản CV đang xem và bố cục của nó được chia sẻ. Mục ẩn, mục trống, PDF gốc và lịch sử phiên bản không được đưa vào liên kết.'),
+    previewLabel, details, confirm);
+}
+
+export function installExtras({ active, addDocument, showDialog, render, currentPreview }) {
   startAnalytics();
   $('language').value = language();
   $('language').onchange = () => { setLanguage($('language').value); render(); };
@@ -187,17 +267,7 @@ export function installExtras({ active, addDocument, showDialog, render }) {
   }
   $('share').onclick = () => {
     if (!active()) return;
-    try {
-      const input = element('input', '');
-      Object.assign(input, { value: shareURL(active().draft), readOnly: true });
-      const label = element('label', 'Liên kết CV');
-      label.append(input);
-      showDialog('Chia sẻ CV', element('p', 'Ai có liên kết đều đọc được nội dung CV. Hãy kiểm tra thông tin cá nhân trước khi gửi.'), label);
-      input.focus();
-      input.select();
-    } catch (error) {
-      showDialog('Chia sẻ CV', element('p', error.message));
-    }
+    showSharePreview(currentPreview(), showDialog);
   };
 
   const example = examples.find(item => item.slug === new URLSearchParams(location.search).get('mau'));
@@ -207,13 +277,9 @@ export function installExtras({ active, addDocument, showDialog, render }) {
     history.replaceState(null, '', location.pathname);
   }
 
-  const shared = location.hash.slice(4);
   if (location.hash.startsWith('#cv=')) {
     try {
-      if (shared.length > 16000) throw new Error();
-      const bytes = Uint8Array.from(atob(shared.replaceAll('-', '+').replaceAll('_', '/')), char => char.charCodeAt(0));
-      const cv = JSON.parse(new TextDecoder().decode(bytes));
-      if (!isCV(cv) || cv.sourcePDF) throw new Error();
+      const cv = decodeSharedCV(location.hash);
       showDialog('Liên kết CV', element('p', cv.name + ' · ' + cv.role), button('Mở bản sao', () => {
         addDocument(createDocument(cv.name || 'CV', cv));
         history.replaceState(null, '', location.pathname);

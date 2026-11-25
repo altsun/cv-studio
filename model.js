@@ -5,6 +5,17 @@ export const emptyCV = () => ({
     .map(title => ({ title, hidden: false, entries: [] })),
 });
 
+// A fresh projection of exactly the editable fields rendered in the CV.
+export function visibleSections(cv) {
+  const entryKeys = Object.keys(emptyEntry());
+  return cv.sections.filter(section => !section.hidden).flatMap(section => {
+    const entries = section.entries.map(entry =>
+      Object.fromEntries(entryKeys.map(key => [key, entry[key]])))
+      .filter(entry => Object.values(entry).some(value => typeof value === 'string' && value.trim()));
+    return entries.length ? [{ title: section.title, hidden: false, entries }] : [];
+  });
+}
+
 export function createDocument(label, draft = emptyCV(), versions = []) {
   return { id: crypto.randomUUID(), label, draft: structuredClone(draft), versions: structuredClone(versions) };
 }

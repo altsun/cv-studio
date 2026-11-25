@@ -25,7 +25,7 @@ Bản dựng nằm trong thư mục `dist/`. Phục vụ thư mục đó bằng 
 
 ## Dữ liệu CV
 
-Bản nháp và lịch sử phiên bản được lưu trong trình duyệt. Dùng nút **Sao lưu** nếu muốn giữ bản sao hoặc chuyển sang trình duyệt khác. Liên kết chia sẻ chứa nội dung CV, nên bất kỳ ai có liên kết đều có thể mở bản sao.
+Bản nháp và lịch sử phiên bản được lưu trong trình duyệt. Dùng nút **Sao lưu** nếu muốn giữ bản sao hoặc chuyển sang trình duyệt khác. Liên kết mới chỉ chứa nội dung CV chỉnh sửa đang hiển thị và bố cục, không chứa mục ẩn, mục trống, PDF gốc hay lịch sử phiên bản. Hãy xem trước phạm vi dữ liệu trước khi tạo liên kết. Bất kỳ ai có liên kết đều có thể đọc nội dung; dữ liệu không được mã hóa bảo mật. Liên kết cũ vẫn mở được nhưng có thể chứa mục ẩn theo định dạng cũ. Tệp sao lưu vẫn giữ đầy đủ bản nháp và các phiên bản đã lưu.
 
 ## Đóng góp
 
