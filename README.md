@@ -27,7 +27,7 @@ The build output is in `dist/`. Serve that directory with a static HTTP server. 
 
 ## Résumé data
 
-Drafts and version history are stored in your browser. Use **Backup** to keep a copy or move your data to another browser. A share link contains the résumé data, so anyone with the link can open a copy.
+Drafts and version history are stored in your browser. Use **Backup** to keep a copy or move your data to another browser. New share links contain only the visible editable résumé and its layout settings, excluding hidden or empty sections, the original PDF, and version history. Review the exact sharing scope before creating the link. Anyone with the link can read its contents; it is not encrypted. Previously created links still open, but may contain hidden information from the old format. Backup files still contain complete drafts and saved versions.
 
 ## Contributing
 

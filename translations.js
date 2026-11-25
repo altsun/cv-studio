@@ -104,6 +104,13 @@ Kiểm tra chính tả bằng AI|Proofread with AI
 Đang tạo gợi ý…|Generating suggestion…
 Không thể tạo gợi ý AI. Hãy thử lại.|Could not generate a suggestion. Try again.
 AI trên thiết bị chưa hỗ trợ ngôn ngữ hoặc trình duyệt này. Bạn vẫn có thể dùng kiểm tra chính tả của trình duyệt.|On-device AI is unavailable for this language or browser. Browser spellcheck is still available.
+Xem trước phạm vi chia sẻ|Preview sharing scope
+Nội dung sẽ được chia sẻ|Content to be shared
+Xem dữ liệu chính xác trong liên kết|View exact link data
+Dữ liệu JSON|JSON data
+Tạo liên kết chia sẻ|Create share link
+Chỉ bản CV đang xem và bố cục của nó được chia sẻ. Mục ẩn, mục trống, PDF gốc và lịch sử phiên bản không được đưa vào liên kết.|Only the resume currently being viewed and its layout are shared. Hidden sections, empty sections, the original PDF and version history are excluded from the link.
+Không thể chia sẻ PDF gốc qua liên kết CV. Hãy chuyển sang Bản chỉnh sửa để xem nội dung có thể chia sẻ.|The original PDF cannot be shared via a resume link. Switch to the editable version to review the content you can share.
 Liên kết CV|Resume link
 Mở bản sao|Open a copy
 Liên kết không hợp lệ.|Invalid link.

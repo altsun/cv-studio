@@ -180,3 +180,111 @@ test('conventional Go and AI spellings match without changing other technology m
     count: 7, score: 100, missing: [],
   });
 });
+
+
+test('share links allowlist visible fields without changing original CV or backups', async t => {
+  globalThis.document = { documentElement: { dataset: {} } };
+  t.after(() => { delete globalThis.document; });
+  const { sharePayload, shareURL, decodeSharedCV } = await import('./studio.js');
+  const entry = {
+    title: 'Kỹ sư thử nghiệm', date: '2025', organization: 'Example Inc',
+    location: 'Test city', body: '- Synthetic project 🚀',
+  };
+  const doc = createDocument('PRIVATE_DOCUMENT_LABEL', {
+    name: 'Fictional Person', role: 'Engineer', contacts: 'test@example.invalid', summary: 'Sample summary',
+    sections: [
+      { title: 'Visible', hidden: false, entries: [{ ...entry, sourcePDF: 'PRIVATE_ENTRY_METADATA' }, {
+        title: '', date: '', organization: '', location: '', body: ' ', note: 'PRIVATE_EMPTY_ENTRY',
+      }], privateNote: 'PRIVATE_SECTION_METADATA' },
+      { title: 'PRIVATE_HIDDEN_TITLE', hidden: true, entries: [{ ...entry, body: 'PRIVATE_HIDDEN_BODY' }] },
+      { title: 'PRIVATE_EMPTY_SECTION', hidden: false, entries: [] },
+    ],
+    sourcePDF: 'data:application/pdf;base64,UFJJVkFURV9QREY=',
+    appearance: { template: 'nodeflair', color: '#123abc', margin: 12, privateNote: 'PRIVATE_APPEARANCE' },
+    pdfLayout: true,
+    versions: [{ cv: { name: 'PRIVATE_DRAFT_METADATA' } }],
+    privateNote: 'PRIVATE_TOP_LEVEL',
+  });
+  saveVersion(doc, 'PRIVATE_VERSION_LABEL', 'PRIVATE_VERSION_NOTE');
+  doc.draft.summary = 'Updated synthetic summary';
+  const backup = { format: 'cv-studio-v1', version: 1, documents: [doc] };
+  const before = JSON.stringify(backup);
+  const payload = sharePayload(doc.draft);
+  const url = new URL(shareURL(doc.draft, 'https://example.invalid/?lang=en#previous'));
+  const decoded = JSON.parse(Buffer.from(url.hash.slice(4), 'base64url').toString('utf8'));
+  assert.equal(url.search, '');
+  assert.deepEqual(decoded, payload);
+  assert.deepEqual(decodeSharedCV(url.hash), payload);
+  assert.deepEqual(decoded, {
+    name: 'Fictional Person', role: 'Engineer', contacts: 'test@example.invalid', summary: 'Updated synthetic summary',
+    sections: [{ title: 'Visible', hidden: false, entries: [entry] }],
+    appearance: { template: 'nodeflair', color: '#123abc', size: 8.4, spacing: 1.43, margin: 12 },
+    pdfLayout: true,
+  });
+  assert.doesNotMatch(JSON.stringify(decoded), /PRIVATE_|sourcePDF|versions/);
+  assert.equal(JSON.stringify(backup), before);
+  assert.equal(isBackup(JSON.parse(before)), true);
+  assert.match(before, /PRIVATE_HIDDEN_BODY/);
+  assert.match(before, /data:application\/pdf;base64,/);
+  assert.match(before, /PRIVATE_VERSION_NOTE/);
+  payload.sections[0].entries[0].body = 'Changed copy';
+  assert.equal(doc.draft.sections[0].entries[0].body, entry.body);
+});
+
+test('legacy links still open, including previously encoded hidden sections', async t => {
+  globalThis.document = { documentElement: { dataset: {} } };
+  t.after(() => { delete globalThis.document; });
+  const { decodeSharedCV, shareURL } = await import('./studio.js');
+  const cv = createDocument('Fictional CV').draft;
+  cv.name = 'Ví dụ';
+  cv.sections[0].hidden = true;
+  cv.sections[0].entries = [{ title: '', date: '', organization: '', location: '', body: 'old hidden content' }];
+  const hash = '#cv=' + Buffer.from(JSON.stringify(cv)).toString('base64url');
+  assert.deepEqual(decodeSharedCV(hash), cv);
+  const reshared = new URL(shareURL(decodeSharedCV(hash), 'https://example.invalid/'));
+  assert.deepEqual(decodeSharedCV(reshared.hash).sections, []);
+  assert.throws(() => decodeSharedCV('#cv=invalid'));
+  assert.throws(() => decodeSharedCV('#cv=' + 'a'.repeat(16001)));
+  const pdfHash = '#cv=' + Buffer.from(JSON.stringify({ ...cv, sourcePDF: 'data:application/pdf;base64,AA==' })).toString('base64url');
+  assert.throws(() => decodeSharedCV(pdfHash));
+  assert.throws(() => shareURL({ ...cv, summary: 'a'.repeat(12001) }, 'https://example.invalid/'), /CV quá dài|too long/);
+});
+
+test('sharing previews the exact snapshot before creating a link and blocks original PDF view', async t => {
+  const fakeElement = tag => ({
+    tag, children: [], append(...children) { this.children.push(...children); },
+    focus() {}, select() {},
+  });
+  globalThis.document = { documentElement: { dataset: {} }, createElement: fakeElement };
+  globalThis.location = { href: 'https://example.invalid/' };
+  t.after(() => { delete globalThis.document; delete globalThis.location; });
+  const { showSharePreview, decodeSharedCV } = await import('./studio.js');
+  const doc = createDocument('Synthetic');
+  doc.draft.name = 'Saved view';
+  doc.draft.sections[0].entries = [{ title: 'Visible job', date: '', organization: '', location: '', body: 'Visible body' }];
+  doc.draft.sections[1].hidden = true;
+  doc.draft.sections[1].entries = [{ title: 'Private job', date: '', organization: '', location: '', body: 'Private body' }];
+  const saved = saveVersion(doc, 'v1', 'Synthetic history');
+  doc.draft.name = 'Different draft';
+  let dialog;
+  const showDialog = (title, ...nodes) => { dialog = { title, nodes }; };
+  const all = nodes => nodes.flatMap(node => [node, ...all(node.children)]);
+  showSharePreview({ cv: saved.cv, original: true }, showDialog);
+  assert.equal(all(dialog.nodes).some(node => node.tag === 'button' || node.tag === 'input'), false);
+  showSharePreview({ cv: saved.cv, original: false }, showDialog);
+  let nodes = all(dialog.nodes);
+  assert.equal(nodes.some(node => node.tag === 'input'), false);
+  const areas = nodes.filter(node => node.tag === 'textarea');
+  assert.equal(areas.length, 2);
+  assert.ok(areas.every(node => node.readOnly));
+  assert.match(areas[0].value, /Saved view/);
+  assert.doesNotMatch(areas[0].value, /Private body|Different draft/);
+  const exact = JSON.parse(areas[1].value);
+  assert.equal(exact.name, 'Saved view');
+  saved.cv.name = 'Changed after review';
+  nodes.find(node => node.tag === 'button').onclick();
+  nodes = all(dialog.nodes);
+  const link = new URL(nodes.find(node => node.tag === 'input').value);
+  assert.deepEqual(decodeSharedCV(link.hash), exact);
+  assert.equal(doc.draft.name, 'Different draft');
+});
